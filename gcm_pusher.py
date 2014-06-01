@@ -34,17 +34,22 @@ def push_one(message):
     TODO Group by id_message, do not send them 1 by 1, google support
     batch send of the same message.
     """
+    log = logging.getLogger('kisspush')
     data = {'registration_ids': [message['registration_id']],
             'data': {'msg': message['message']}}
+    if message['collapse_key'] is not None:
+        data['collapse_key'] = message['collapse_key']
+    data = json.dumps(data)
     headers = {'Content-Type': 'application/json',
                'Authorization': 'key=' + config['api_key']}
     url = 'https://android.googleapis.com/gcm/send'
+    log.debug("Will send %s", data)
     try:
-        response = requests.post(url, data=json.dumps(data), headers=headers)
+        response = requests.post(url, data=data, headers=headers)
     except Exception:
-        logging.getLogger('kisspush').exception("Sending a message to GCM")
+        log.exception("Sending a message to GCM")
     else:
-        logging.getLogger('kisspush').info(response.content)
+        log.info(response.content)
 
 
 def parse_args(print_help=False):

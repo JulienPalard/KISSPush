@@ -126,9 +126,10 @@ def alias_get(reg_id):
                  (user[0]['user_id']))
 
 
-def message_create(message, to_alias):
-    success, message_id = query("""INSERT INTO message (message, retry_after)
-                                   VALUES (%s, NOW())""", message)
+def message_create(message, to_alias, collapse_key):
+    success, message_id = query("""
+        INSERT INTO message (message, retry_after, collapse_key)
+             VALUES (%s, NOW(), %s)""", message, collapse_key)
     qte, recipients = user_get(alias=to_alias)
     for recipient in recipients:
         query("""INSERT INTO recipient (message_id, user_id)
@@ -138,7 +139,8 @@ def message_create(message, to_alias):
 
 
 def messages_to_send():
-    q = """SELECT message.message_id, message.message, user.registration_id
+    q = """SELECT message.message_id, message.message,
+                  message.collapse_key, user.registration_id
              FROM message
              JOIN recipient USING (message_id)
              JOIN user USING (user_id)

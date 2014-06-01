@@ -14,7 +14,7 @@ CREATE TABLE user
     KEY `ri` (registration_id(767))
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_bin
 """,
-"""
+                """
 CREATE TABLE alias
 (
     user_id INT UNSIGNED NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE alias
     PRIMARY KEY (alias, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
 """,
-"""
+                """
 CREATE TABLE message
 (
     message_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -36,7 +36,7 @@ CREATE TABLE message
     KEY r_ra (status, retry_after)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
 """,
-"""
+                """
 CREATE TABLE recipient
 (
     message_id INT UNSIGNED NOT NULL,
@@ -46,5 +46,8 @@ CREATE TABLE recipient
     gcm_registration_id varchar(4096) NULL COMMENT "See Canonical IDs",
     PRIMARY KEY (message_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+""",
+                """
+ALTER TABLE message ADD collapse_key VARCHAR(64) NULL;
 """
-]
+                ]

@@ -96,10 +96,11 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         msg = self.param_get(params, 'msg', None)
         to = self.param_get(params, 'to', None)
+        collapse_key = self.param_get(params, 'collapse_key', None)
         if msg is None or to is None:
             self.send_response(500)
             return
-        self.wfile.write(json.dumps(message_create(msg, to)))
+        self.wfile.write(json.dumps(message_create(msg, to, collapse_key)))
         self.send_response(200)
 
 
