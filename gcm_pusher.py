@@ -49,17 +49,81 @@ class GCM_Pusher():
             self.log.info("Will backoff %d seconds after receiving a %d error",
                           self.backoff, response.status_code)
 
-    def handle_result(self, result, registration_id):
-        if 'error' in result:
-            if result['error'] == "InvalidRegistration":
+    def handle_result(self, message_id, registration_id, result):
+        # If message_id is set, check for registration_id:
+        if 'message_id' in result:
+            # If registration_id is set,
+            if 'registration_id' in result:
+                # replace the original ID with the new value
+                # (canonical ID) in your server database. Note that
+                # the original ID is not part of the result, so you
+                # need to obtain it from the list of registration_ids
+                # passed in the request (using the same index).
+                user_update({'registration_id': result['registration_id']},
+                            registration_id=registration_id)
+        elif 'error' in result:  # Otherwise, get the value of error:
+            if result['error'] == 'Unavailable':
+                # If it is Unavailable, you could retry to send it in
+                # another request.
+                # TODO
+                pass
+            elif result['error'] == "InvalidRegistration":
+                # If it is NotRegistered, you should remove the
+                # registration ID from your server database because
+                # the application was uninstalled from the device or
+                # it does not have a broadcast receiver configured to
+                # receive com.google.android.c2dm.intent.RECEIVE
+                # intents.
                 user_update({'valid': 0},
                             registration_id=registration_id)
-        print registration_id, result
+            elif result['error'] == "MissingRegistration":
+                self.log.error("Oops, missing registration id in message %d ?",
+                               message_id)
+            elif result['error'] == 'MismatchSenderId':
+                self.log.error("Oops, mismatching sender id in message %d "
+                               "Dropping registration_id %s, won't work again "
+                               "if you switched sender_id.",
+                               message_id, registration_id)
+                user_update({'valid': 0},
+                            registration_id=registration_id)
+            elif result['error'] == "NotRegistered":
+                self.log.error("Oops, registration_id seems not registered, "
+                               "in message %d."
+                               "Dropping registration_id %s.",
+                               message_id, registration_id)
+                user_update({'valid': 0},
+                            registration_id=registration_id)
+            elif result['error'] == 'MessageTooBig':
+                self.log.error("Oops, message %d too big.", message_id)
+            elif result['error'] == 'InvalidTtl.':
+                self.log.error("Oops, invalid TTL for message %d.", message_id)
+            elif result['error'] == 'InvalidDataKey':
+                self.log.error("Oops, payload contains an invalid data key "
+                               "in message %d.", message_id)
+            elif result['error'] == 'InvalidPackageName':
+                self.log.error("Oops, invalid package name "
+                               "for message %d.", message_id)
+            elif result['error'] == 'InternalServerError':
+                self.log.error("Oops, got an Internal Server Error from GCM, "
+                               "for message %d.", message_id)
+
+
+
+            else:
+                # Otherwise, there is something wrong in the
+                # registration ID passed in the request; it is
+                # probably a non-recoverable error that will also
+                # require removing the registration from the server
+                # database. See Interpreting an error response for all
+                # possible error values.
+                self.log.error("%s from GCM servers, "
+                               "marking user as invalid.", result['error'])
+                user_update({'valid': 0},
+                            registration_id=registration_id)
 
     def push_one(self, message):
         data = {'registration_ids': message['registration_ids'],
-                'data': {'msg': message['message']},
-                'dry_run': True}
+                'data': {'msg': message['message']}}
         if message['collapse_key'] is not None:
             data['collapse_key'] = message['collapse_key']
         if message['delay_while_idle']:
@@ -76,13 +140,17 @@ class GCM_Pusher():
             message_update({'multicast_id': parsed_response['multicast_id']},
                            message_id=message['message_id'])
 
-            for i, result in enumerate(parsed_response['results']):
-                self.handle_result(result, message['registration_ids'][i])
-            # {"multicast_id":1821716262194746,"success":1,"failure":0,
-            #   "canonical_ids":0,
-            #   "results":[{"message_id":
-            #               "0:1063362409caf9fed"}]}
-
+            # If the value of failure and canonical_ids is 0, it's not
+            # necessary to parse the remainder of the
+            # response.
+            if ((parsed_response['failure'] > 0 or
+                 parsed_response['canonical_ids'] > 0)):
+                # Otherwise, we recommend that you iterate
+                # through the results field and do the following for each
+                # object in that list:
+                for i, result in enumerate(parsed_response['results']):
+                    self.handle_result(message['message_id'],
+                                       message['registration_ids'][i], result)
             self.log.info(response.content)
 
 
