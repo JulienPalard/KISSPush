@@ -15,7 +15,9 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         params = urlparse.parse_qs(urlparse.urlparse(self.path).query)
         if self.path.startswith("/alias"):
             return self.alias_get(params)
-        self.send_response(500)
+        if self.path == "/":
+            return self.index()
+        self.send_response(400)
 
     def do_POST(self):
         (content_type, dict) = cgi.parse_header(
@@ -34,7 +36,15 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if self.path == "/alias":
             return self.alias(params)
 
-        self.send_response(500)
+        self.send_response(400)
+
+    def index(self):
+        doc = {'endpoints': {'POST': {'/register': ['reg_id'],
+                                      '/send': ['msg', 'to', '[collapse_key]',
+                                                '[delay_while_idle]'],
+                                      '/alias': ['reg_id', 'alias']},
+                             'GET': {'/alias': ['reg_id']}}}
+        self.wfile.write(json.dumps(doc))
 
     def param_get(self, params, name, default):
         try:
@@ -61,7 +71,7 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def alias_get(self, params):
         reg_id = self.param_get(params, 'reg_id', None)
         if reg_id is None:
-            self.send_response(500)
+            self.send_response(400)
             return
         count, aliases = alias_get(reg_id)
         alias_list = [alias['alias'] for alias in aliases]
@@ -99,7 +109,7 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         collapse_key = self.param_get(params, 'collapse_key', None)
         delay_while_idle = self.param_get(params, 'delay_while_idle', False)
         if msg is None or to is None:
-            self.send_response(500)
+            self.send_response(400)
             return
         self.wfile.write(json.dumps(message_create(msg, to, collapse_key,
                                                    delay_while_idle)))
