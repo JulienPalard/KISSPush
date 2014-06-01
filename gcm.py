@@ -156,3 +156,14 @@ def messages_to_send():
         query("UPDATE message SET status = 'done'"
               "WHERE message_id IN (" + ','.join(ids) + ")")
     return todo
+
+
+def message_update(message_id, **kwargs):
+    sql_set = []
+    sql_values = []
+    for key, value in kwargs.iteritems():
+        sql_set.append("%s = %%s" % key)
+        sql_values.append(value)
+    sql_values.append(message_id)
+    q = "UPDATE message SET " + ', '.join(sql_set) + " WHERE message_id = %s"
+    return query(q)

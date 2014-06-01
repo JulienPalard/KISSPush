@@ -6,7 +6,8 @@ from config import config
 from argparse import ArgumentParser
 import logging
 from time import sleep
-from gcm import messages_to_send, setup_logging, MySQL_schema_update
+from gcm import messages_to_send, setup_logging, MySQL_schema_update, \
+    message_update
 
 
 class GCM_Pusher():
@@ -67,6 +68,14 @@ class GCM_Pusher():
         except Exception:
             self.log.exception("While sending a message to GCM")
         else:
+            parsed_response = response.json()
+            message_update(message['message_id'],
+                           multicast_id=parsed_response['multicast_id'])
+            # {"multicast_id":1821716262194746,"success":1,"failure":0,
+            #   "canonical_ids":0,
+            #   "results":[{"message_id":
+            #               "0:1063362409caf9fed"}]}
+
             self.log.info(response.content)
 
 
