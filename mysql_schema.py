@@ -54,7 +54,11 @@ ALTER TABLE message ADD collapse_key VARCHAR(64) NULL;
 ALTER TABLE message ADD delay_while_idle INT(1) UNSIGNED NOT NULL DEFAULT 0;
 """,
                 """
-ALTER TABLE message ADD multicast_id VARCHAR(64) NuLL;
+ALTER TABLE message ADD multicast_id VARCHAR(64) NULL;
+
+""",
+                """
+ALTER TABLE user ADD valid INT(1) NOT NULL DEFAULT 1;
 
 """
                 ]

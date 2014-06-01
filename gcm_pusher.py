@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 import logging
 from time import sleep
 from gcm import messages_to_send, setup_logging, MySQL_schema_update, \
-    message_update
+    message_update, user_update
 
 
 class GCM_Pusher():
@@ -49,13 +49,17 @@ class GCM_Pusher():
             self.log.info("Will backoff %d seconds after receiving a %d error",
                           self.backoff, response.status_code)
 
+    def handle_result(self, result, registration_id):
+        if 'error' in result:
+            if result['error'] == "InvalidRegistration":
+                user_update({'valid': 0},
+                            registration_id=registration_id)
+        print registration_id, result
+
     def push_one(self, message):
-        """
-        TODO Group by id_message, do not send them 1 by 1, google support
-        batch send of the same message.
-        """
-        data = {'registration_ids': [message['registration_id']],
-                'data': {'msg': message['message']}}
+        data = {'registration_ids': message['registration_ids'],
+                'data': {'msg': message['message']},
+                'dry_run': True}
         if message['collapse_key'] is not None:
             data['collapse_key'] = message['collapse_key']
         if message['delay_while_idle']:
@@ -69,8 +73,11 @@ class GCM_Pusher():
             self.log.exception("While sending a message to GCM")
         else:
             parsed_response = response.json()
-            message_update(message['message_id'],
-                           multicast_id=parsed_response['multicast_id'])
+            message_update({'multicast_id': parsed_response['multicast_id']},
+                           message_id=message['message_id'])
+
+            for i, result in enumerate(parsed_response['results']):
+                self.handle_result(result, message['registration_ids'][i])
             # {"multicast_id":1821716262194746,"success":1,"failure":0,
             #   "canonical_ids":0,
             #   "results":[{"message_id":

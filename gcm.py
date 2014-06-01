@@ -142,15 +142,22 @@ def message_create(message, to_alias, collapse_key=None,
 
 
 def messages_to_send():
-    q = """SELECT message.message_id, message.message,
-                  message.collapse_key, user.registration_id,
-                  message.delay_while_idle
-             FROM message
-             JOIN recipient USING (message_id)
-             JOIN user USING (user_id)
-            WHERE message.status = "todo"
-                  AND retry_after < NOW()"""
+    q = """
+   SELECT message.message_id,
+          message.message,
+          message.collapse_key,
+          message.delay_while_idle,
+          GROUP_CONCAT(user.registration_id SEPARATOR 0x1D) AS registration_ids
+     FROM message
+     JOIN recipient USING (message_id)
+     JOIN user USING (user_id)
+    WHERE message.status = "todo"
+          AND retry_after < NOW()
+          AND user.valid = 1
+ GROUP BY message.message_id"""
     count, todo = query(q)
+    for each in todo:
+        each['registration_ids'] = each['registration_ids'].split('\x1D')
     if count > 0:
         ids = [str(message['message_id']) for message in todo]
         query("UPDATE message SET status = 'done'"
@@ -158,12 +165,24 @@ def messages_to_send():
     return todo
 
 
-def message_update(message_id, **kwargs):
+def update(table, update_set, conditions):
     sql_set = []
     sql_values = []
-    for key, value in kwargs.iteritems():
+    sql_where = []
+    for key, value in update_set.iteritems():
         sql_set.append("%s = %%s" % key)
         sql_values.append(value)
-    sql_values.append(message_id)
-    q = "UPDATE message SET " + ', '.join(sql_set) + " WHERE message_id = %s"
-    return query(q)
+    for key, value in conditions.iteritems():
+        sql_where.append("%s = %%s" % key)
+        sql_values.append(value)
+    q = ("UPDATE " + table + " SET " + ', '.join(sql_set) +
+         " WHERE " + ' AND '.join(sql_where))
+    return query(q, sql_values)
+
+
+def message_update(update_set, message_id):
+    return update('message', update_set, {'message_id': message_id})
+
+
+def user_update(update_set, registration_id):
+    return update('user', update_set, {'registration_id': registration_id})
