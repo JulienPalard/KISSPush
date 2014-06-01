@@ -39,6 +39,8 @@ def push_one(message):
             'data': {'msg': message['message']}}
     if message['collapse_key'] is not None:
         data['collapse_key'] = message['collapse_key']
+    if message['delay_while_idle']:
+        message['delay_while_idle'] = True
     data = json.dumps(data)
     headers = {'Content-Type': 'application/json',
                'Authorization': 'key=' + config['api_key']}

@@ -49,5 +49,8 @@ CREATE TABLE recipient
 """,
                 """
 ALTER TABLE message ADD collapse_key VARCHAR(64) NULL;
+""",
+                """
+ALTER TABLE message ADD delay_while_idle INT(1) UNSIGNED NOT NULL DEFAULT 0;
 """
                 ]
