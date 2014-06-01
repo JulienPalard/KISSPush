@@ -65,6 +65,7 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         reg_id = self.param_get(params, 'reg_id', None)
         if reg_id is None:
             self.send_response(400)
+            return
         user_create(reg_id)
         self.send_response(200)
 
