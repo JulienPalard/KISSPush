@@ -3,6 +3,7 @@
 from mysql_schema import mysql_schema
 from config import config
 import logging
+import warnings
 import MySQLdb
 
 """
@@ -50,7 +51,9 @@ def MySQL_schema_update():
         PRIMARY KEY (`statement`(767))
     ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_bin
     """
-    c.execute(initial_config)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        c.execute(initial_config)
     for statement in mysql_schema:
         stmt = "SELECT 1 FROM schema_history WHERE statement = %s"
         c.execute(stmt, statement)
