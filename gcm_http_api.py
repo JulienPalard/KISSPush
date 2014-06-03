@@ -17,7 +17,8 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             return self.alias_get(params)
         if self.path == "/":
             return self.index()
-        self.send_response(400)
+        self.send_response(404, "Endpoint not found")
+        self.end_headers()
 
     def do_POST(self):
         (content_type, dict) = cgi.parse_header(
@@ -29,14 +30,15 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             params = cgi.parse_qs(self.rfile.read(length), keep_blank_values=1)
         else:
             params = {}
-        if self.path == "/register":
+        if self.path.startswith("/register"):
             return self.register(params)
-        if self.path == "/send":
+        if self.path.startswith("/send"):
             return self.send(params)
-        if self.path == "/alias":
+        if self.path.startswith("/alias"):
             return self.alias(params)
 
-        self.send_response(400)
+        self.send_response(404, "Endpoint not found")
+        self.end_headers()
 
     def index(self):
         doc = {'endpoints': {'POST': {'/register': ['reg_id'],
@@ -51,7 +53,7 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             value = params[name][0].strip()
             if len(value) > 0:
                 return value
-        except (ValueError, IndexError):
+        except (IndexError, KeyError):
             pass
         return default
 
@@ -64,20 +66,26 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         """
         reg_id = self.param_get(params, 'reg_id', None)
         if reg_id is None:
-            self.send_response(400)
+            self.send_response(400, "Missing parameter reg_id")
+            self.end_headers()
             return
-        user_create(reg_id)
         self.send_response(200)
+        self.end_headers()
+        user_create(reg_id)
 
     def alias_get(self, params):
         reg_id = self.param_get(params, 'reg_id', None)
         if reg_id is None:
-            self.send_response(400)
+            self.send_response(400, "Missing parameter reg_id")
+            self.end_headers()
             return
         count, aliases = alias_get(reg_id)
+        if count == 0:
+            aliases = []
         alias_list = [alias['alias'] for alias in aliases]
-        self.wfile.write(json.dumps(alias_list))
         self.send_response(200)
+        self.end_headers()
+        self.wfile.write(json.dumps(alias_list))
 
     def alias(self, params):
         """
@@ -89,11 +97,14 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         reg_id = self.param_get(params, 'reg_id', None)
         alias = self.param_get(params, 'alias', None)
         if reg_id is None or alias is None:
-            self.send_response(400)
+            self.send_response(400, "Missing parameter reg_id or alias")
+            self.end_headers()
         if alias_create(reg_id, alias) is not None:
             self.send_response(200)
+            self.end_headers()
         else:
-            self.send_response(404)
+            self.send_response(404, "reg_id not found")
+            self.end_headers()
 
     def send(self, params):
         """
@@ -110,11 +121,13 @@ class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         collapse_key = self.param_get(params, 'collapse_key', None)
         delay_while_idle = self.param_get(params, 'delay_while_idle', False)
         if msg is None or to is None:
-            self.send_response(400)
+            self.send_response(400, "Missing parameter msg or to")
+            self.end_headers()
             return
+        self.send_response(200)
+        self.end_headers()
         self.wfile.write(json.dumps(message_create(msg, to, collapse_key,
                                                    delay_while_idle)))
-        self.send_response(200)
 
 
 def parse_args(print_help=False):

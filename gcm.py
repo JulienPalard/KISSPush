@@ -123,7 +123,7 @@ def alias_create(reg_id, alias):
 def alias_get(reg_id):
     found, user = user_get(reg_id)
     if not found:
-        return None
+        return 0, None
     return query("""SELECT alias FROM alias
                     WHERE user_id = %s""",
                  (user[0]['user_id']))
@@ -134,8 +134,8 @@ def message_create(message, to_alias, collapse_key=None,
     success, message_id = query("""
         INSERT INTO message (message, retry_after,
                              collapse_key, delay_while_idle)
-             VALUES (%s, NOW(), %s, %s)""", message, collapse_key,
-                                1 if delay_while_idle else 0)
+             VALUES (%s, NOW(), %s, %s)""", (message, collapse_key,
+                                1 if delay_while_idle else 0))
     qte, recipients = user_get(alias=to_alias)
     for recipient in recipients:
         query("""INSERT INTO recipient (message_id, user_id)
