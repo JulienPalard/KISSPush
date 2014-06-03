@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package com.google.android.gcm.demo.app;
+package fr.mdk.kisspush;
 
+import com.google.android.gcm.demo.app.R;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 
 import android.app.IntentService;
