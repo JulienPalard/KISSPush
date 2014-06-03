@@ -20,6 +20,7 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 import com.loopj.android.http.AsyncHttpResponseHandler;
+import com.loopj.android.http.JsonHttpResponseHandler;
 import com.loopj.android.http.RequestParams;
 
 import android.app.Activity;
@@ -50,6 +51,9 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * Main UI for the demo app.
@@ -236,10 +240,21 @@ public class KISSPush extends Activity {
 
 	private void getAliases() {
 		KISSPushClient.get("alias", new RequestParams("reg_id", regid),
-				new AsyncHttpResponseHandler() {
+				new JsonHttpResponseHandler() {
 					@Override
-					public void onSuccess(String response) {
-						mDisplay.append(response + "\n");
+					public void onSuccess(JSONArray response) {
+						String alias;
+						try {
+							for (int i = 0; i < response.length(); i++) {
+
+								alias = response.getString(i);
+								mDisplay.append(" -> " + alias + "\n");
+								;
+							}
+						} catch (JSONException e) {
+							Log.e(TAG, "Can't parse /alias response");
+						}
+
 					}
 				});
 
