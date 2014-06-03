@@ -235,53 +235,14 @@ public class KISSPush extends Activity {
 	}
 
 	private void getAliases() {
-		new AsyncTask<Void, Void, String>() {
-			@Override
-			protected String doInBackground(Void... params) {
-				// mDisplay.append("Fetching aliases...\n");
-				Uri uri = Uri.parse("http://mdk.fr:8080").buildUpon()
-						.path("/alias").appendQueryParameter("reg_id", regid)
-						.build();
-				Log.i(TAG, uri.toString());
-				HttpGet httpget = new HttpGet(uri.toString());
-				HttpResponse response = null;
-				try {
-					HttpClient httpclient = new DefaultHttpClient();
-					response = httpclient.execute(httpget);
-				} catch (ClientProtocolException e) {
-					Log.e(TAG, e.getMessage(), e);
-				} catch (IOException e) {
-					Log.e(TAG, e.getMessage(), e);
-				}
-				StatusLine statusLine = response.getStatusLine();
-				if (statusLine.getStatusCode() == HttpStatus.SC_OK) {
-					ByteArrayOutputStream out = new ByteArrayOutputStream();
-					try {
-						response.getEntity().writeTo(out);
-						String message = out.toString();
-						out.close();
-						return message;
-					} catch (IOException e) {
-						return null;
+		KISSPushClient.get("alias", new RequestParams("reg_id", regid),
+				new AsyncHttpResponseHandler() {
+					@Override
+					public void onSuccess(String response) {
+						mDisplay.append(response + "\n");
 					}
-				} else {
-					Log.d(TAG, "Cannot fetch aliases...");
-					try {
-						response.getEntity().getContent().close();
-					} catch (IllegalStateException e) {
-						return null;
-					} catch (IOException e) {
-						return null;
-					}
-				}
-				return null;
-			}
+				});
 
-			@Override
-			protected void onPostExecute(String response) {
-				mDisplay.append(response + "\n");
-			}
-		}.execute(null, null, null);
 	}
 
 	@Override
