@@ -16,10 +16,8 @@
 package fr.mdk.kisspush;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import org.json.JSONArray;
-import org.json.JSONException;
 
 import android.app.Activity;
 import android.content.Context;
@@ -35,9 +33,6 @@ import com.google.android.gcm.demo.app.R;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
-import com.loopj.android.http.AsyncHttpResponseHandler;
-import com.loopj.android.http.JsonHttpResponseHandler;
-import com.loopj.android.http.RequestParams;
 
 /**
  * Main UI for the demo app.
@@ -48,17 +43,13 @@ public class KISSPush extends Activity {
 	public static final String PROPERTY_REG_ID = "registration_id";
 	private static final String PROPERTY_APP_VERSION = "appVersion";
 	private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
-
-	/**
-	 * Substitute you own sender ID here. This is the project number you got
-	 * from the API Console, as described in "Getting Started."
-	 */
+	private KISSPushClient kiss_push_cli = new KISSPushClient();
 	String SENDER_ID = "1082216905118";
 
 	/**
 	 * Tag used on log messages.
 	 */
-	static final String TAG = "GCM Demo";
+	static final String TAG = "KISSPush";
 
 	TextView mDisplay;
 	GoogleCloudMessaging gcm;
@@ -76,8 +67,6 @@ public class KISSPush extends Activity {
 
 		context = getApplicationContext();
 
-		// Check device for Play Services APK. If check succeeds, proceed with
-		// GCM registration.
 		if (checkPlayServices()) {
 			gcm = GoogleCloudMessaging.getInstance(this);
 			regid = getRegistrationId(context);
@@ -85,11 +74,9 @@ public class KISSPush extends Activity {
 			if (regid.isEmpty()) {
 				registerInBackground();
 			} else {
-				// Optional: This may have been done once the first time in
-				// registerInBackground.
-				sendRegistrationIdToBackend(regid);
+				kiss_push_cli.set_reg_id(regid);
+				kiss_push_cli.register();
 			}
-			// getAliases();
 		} else {
 			Log.i(TAG, "No valid Google Play Services APK found.");
 		}
@@ -192,19 +179,8 @@ public class KISSPush extends Activity {
 					}
 					regid = gcm.register(SENDER_ID);
 					msg = "Device registered, registration ID=" + regid;
-
-					// You should send the registration ID to your server over
-					// HTTP, so it
-					// can use GCM/HTTP or CCS to send messages to your app.
-					sendRegistrationIdToBackend(regid);
-
-					// For this demo: we don't need to send it because the
-					// device will send
-					// upstream messages to a server that echo back the message
-					// using the
-					// 'from' address in the message.
-
-					// Persist the regID - no need to register again.
+					kiss_push_cli.set_reg_id(regid);
+					kiss_push_cli.register();
 					storeRegistrationId(context, regid);
 				} catch (IOException ex) {
 					msg = "Error :" + ex.getMessage();
@@ -223,25 +199,16 @@ public class KISSPush extends Activity {
 	}
 
 	private void getAliases() {
-		KISSPushClient.get("alias", new RequestParams("reg_id", regid),
-				new JsonHttpResponseHandler() {
-					@Override
-					public void onSuccess(JSONArray response) {
-						String alias;
-						try {
-							for (int i = 0; i < response.length(); i++) {
+		kiss_push_cli.get_alias(new KISSPushClient.Callback<ArrayList<String>>(){
 
-								alias = response.getString(i);
-								mDisplay.append(" -> " + alias + "\n");
-								;
-							}
-						} catch (JSONException e) {
-							Log.e(TAG, "Can't parse /alias response");
-						}
+			@Override
+			public void callback(ArrayList<String> t) {
+				for (String s : t)
+				    mDisplay.append("#" + s + "\n");
 
-					}
-				});
 
+			}
+			});
 	}
 
 	@Override
@@ -272,15 +239,5 @@ public class KISSPush extends Activity {
 		// how you store the regID in your app is up to you.
 		return getSharedPreferences(KISSPush.class.getSimpleName(),
 				Context.MODE_PRIVATE);
-	}
-
-	private void sendRegistrationIdToBackend(String regId) {
-		KISSPushClient.post("register", new RequestParams("reg_id", regId),
-				new AsyncHttpResponseHandler() {
-					@Override
-					public void onSuccess(String response) {
-						Log.i(TAG, "Registration sent.");
-					}
-				});
 	}
 }
