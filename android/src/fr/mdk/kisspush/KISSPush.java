@@ -20,14 +20,21 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.TextView;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ListView;
 
 import com.google.android.gcm.demo.app.R;
 import com.google.android.gms.common.ConnectionResult;
@@ -51,7 +58,8 @@ public class KISSPush extends Activity {
 	 */
 	static final String TAG = "KISSPush";
 
-	TextView mDisplay;
+	ListView mDisplay;
+	Button mSubscribe;
 	GoogleCloudMessaging gcm;
 	AtomicInteger msgId = new AtomicInteger();
 	Context context;
@@ -63,7 +71,8 @@ public class KISSPush extends Activity {
 		super.onCreate(savedInstanceState);
 
 		setContentView(R.layout.main);
-		mDisplay = (TextView) findViewById(R.id.display);
+		mDisplay = (ListView) findViewById(R.id.display);
+		mSubscribe = (Button) findViewById(R.id.subscribe);
 
 		context = getApplicationContext();
 
@@ -77,6 +86,46 @@ public class KISSPush extends Activity {
 				kiss_push_cli.set_reg_id(regid);
 				kiss_push_cli.register();
 			}
+			final Activity act = this;
+			mSubscribe.setOnClickListener(new View.OnClickListener() {
+				public void onClick(View v) {
+					// get prompts.xml view
+					LayoutInflater layoutInflater = getLayoutInflater();
+					View promptView = layoutInflater.inflate(R.layout.prompts,
+							null);
+					AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(
+							act);
+					// set prompts.xml to be the layout file of the alertdialog
+					// builder
+					alertDialogBuilder.setView(promptView);
+					final EditText input = (EditText) promptView
+							.findViewById(R.id.userInput);
+					// setup a dialog window
+					alertDialogBuilder
+							.setCancelable(false)
+							.setPositiveButton("OK",
+									new DialogInterface.OnClickListener() {
+										public void onClick(
+												DialogInterface dialog, int id) {
+											// get user input and set it to
+											// result
+											kiss_push_cli.add_alias(input.getText().toString());
+											// editTextMainScreen.setText(input
+											// .getText());
+										}
+									})
+							.setNegativeButton("Cancel",
+									new DialogInterface.OnClickListener() {
+										public void onClick(
+												DialogInterface dialog, int id) {
+											dialog.cancel();
+										}
+									});
+					// create an alert dialog
+					AlertDialog alertD = alertDialogBuilder.create();
+					alertD.show();
+				}
+			});
 		} else {
 			Log.i(TAG, "No valid Google Play Services APK found.");
 		}
@@ -185,7 +234,8 @@ public class KISSPush extends Activity {
 				} catch (IOException ex) {
 					msg = "Error :" + ex.getMessage();
 					// If there is an error, don't just keep trying to register.
-					// Require the user to click a button again, or perform
+					// Require the useor other views support the
+					// swipe-to-dismissr to click a button again, or perform
 					// exponential back-off.
 				}
 				return msg;
@@ -193,22 +243,22 @@ public class KISSPush extends Activity {
 
 			@Override
 			protected void onPostExecute(String msg) {
-				mDisplay.append(msg + "\n");
 			}
 		}.execute(null, null, null);
 	}
 
 	private void getAliases() {
-		kiss_push_cli.get_alias(new KISSPushClient.Callback<ArrayList<String>>(){
+		kiss_push_cli
+				.get_alias(new KISSPushClient.Callback<ArrayList<String>>() {
 
-			@Override
-			public void callback(ArrayList<String> t) {
-				for (String s : t)
-				    mDisplay.append("#" + s + "\n");
+					@Override
+					public void callback(ArrayList<String> t) {
+						ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+								context, android.R.layout.simple_list_item_1, t);
 
-
-			}
-			});
+						mDisplay.setAdapter(adapter);
+					}
+				});
 	}
 
 	@Override

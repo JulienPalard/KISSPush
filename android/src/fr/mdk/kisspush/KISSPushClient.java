@@ -46,6 +46,17 @@ public class KISSPushClient {
 		client.post(getAbsoluteUrl(url), params, responseHandler);
 	}
 
+	public void add_alias(String alias)
+	{
+		RequestParams add_alias_params = new RequestParams();
+		add_alias_params.add("reg_id", reg_id);
+		add_alias_params.add("alias", alias);
+		this.post("alias", add_alias_params,
+				new JsonHttpResponseHandler(){
+
+		});
+	}
+
 	private String getAbsoluteUrl(String relativeUrl) {
 		return BASE_URL + relativeUrl;
 	}
