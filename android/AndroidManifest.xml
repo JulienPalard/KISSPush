@@ -48,7 +48,7 @@
     <!-- Main activity. -->
     <application
         android:icon="@drawable/ic_launcher"
-        android:label="@string/app_name" android:allowBackup="true">
+        android:label="@string/app_name" android:allowBackup="true" android:theme="@style/Theme.AppCompat">
         <!-- Required for applications which use Google Play Services. -->
         <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version" />
 

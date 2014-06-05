@@ -28,8 +28,12 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -44,7 +48,7 @@ import com.google.android.gms.gcm.GoogleCloudMessaging;
 /**
  * Main UI for the demo app.
  */
-public class KISSPush extends Activity {
+public class KISSPush extends ActionBarActivity {
 
 	public static final String EXTRA_MESSAGE = "message";
 	public static final String PROPERTY_REG_ID = "registration_id";
@@ -59,7 +63,6 @@ public class KISSPush extends Activity {
 	static final String TAG = "KISSPush";
 
 	ListView mDisplay;
-	Button mSubscribe;
 	GoogleCloudMessaging gcm;
 	AtomicInteger msgId = new AtomicInteger();
 	Context context;
@@ -72,8 +75,6 @@ public class KISSPush extends Activity {
 
 		setContentView(R.layout.main);
 		mDisplay = (ListView) findViewById(R.id.display);
-		mSubscribe = (Button) findViewById(R.id.subscribe);
-
 		context = getApplicationContext();
 
 		if (checkPlayServices()) {
@@ -86,49 +87,63 @@ public class KISSPush extends Activity {
 				kiss_push_cli.set_reg_id(regid);
 				kiss_push_cli.register();
 			}
-			final Activity act = this;
-			mSubscribe.setOnClickListener(new View.OnClickListener() {
-				public void onClick(View v) {
-					// get prompts.xml view
-					LayoutInflater layoutInflater = getLayoutInflater();
-					View promptView = layoutInflater.inflate(R.layout.prompts,
-							null);
-					AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(
-							act);
-					// set prompts.xml to be the layout file of the alertdialog
-					// builder
-					alertDialogBuilder.setView(promptView);
-					final EditText input = (EditText) promptView
-							.findViewById(R.id.userInput);
-					// setup a dialog window
-					alertDialogBuilder
-							.setCancelable(false)
-							.setPositiveButton("OK",
-									new DialogInterface.OnClickListener() {
-										public void onClick(
-												DialogInterface dialog, int id) {
-											// get user input and set it to
-											// result
-											kiss_push_cli.add_alias(input.getText().toString());
-											// editTextMainScreen.setText(input
-											// .getText());
-										}
-									})
-							.setNegativeButton("Cancel",
-									new DialogInterface.OnClickListener() {
-										public void onClick(
-												DialogInterface dialog, int id) {
-											dialog.cancel();
-										}
-									});
-					// create an alert dialog
-					AlertDialog alertD = alertDialogBuilder.create();
-					alertD.show();
-				}
-			});
 		} else {
 			Log.i(TAG, "No valid Google Play Services APK found.");
 		}
+	}
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		MenuInflater inflater = getMenuInflater();
+		inflater.inflate(R.menu.main_activity_actions, menu);
+		return super.onCreateOptionsMenu(menu);
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		// Handle presses on the action bar items
+		switch (item.getItemId()) {
+		case R.id.action_add:
+			openAdd();
+			return true;
+		default:
+			return super.onOptionsItemSelected(item);
+		}
+	}
+
+	protected void openAdd() {
+		final Activity act = this;
+		// get prompts.xml view
+		LayoutInflater layoutInflater = getLayoutInflater();
+		View promptView = layoutInflater.inflate(R.layout.prompts, null);
+		AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(act);
+		// set prompts.xml to be the layout file of the alertdialog
+		// builder
+		alertDialogBuilder.setView(promptView);
+		final EditText input = (EditText) promptView
+				.findViewById(R.id.userInput);
+		// setup a dialog window
+		alertDialogBuilder
+				.setCancelable(false)
+				.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+					public void onClick(DialogInterface dialog, int id) {
+						// get user input and set it to
+						// result
+						kiss_push_cli.add_alias(input.getText().toString());
+						// editTextMainScreen.setText(input
+						// .getText());
+					}
+				})
+				.setNegativeButton("Cancel",
+						new DialogInterface.OnClickListener() {
+							public void onClick(DialogInterface dialog, int id) {
+								dialog.cancel();
+							}
+						});
+		// create an alert dialog
+		AlertDialog alertD = alertDialogBuilder.create();
+		alertD.show();
+
 	}
 
 	@Override
