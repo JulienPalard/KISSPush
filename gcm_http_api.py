@@ -6,8 +6,7 @@ from argparse import ArgumentParser
 import logging
 from RESTHandler import RESTHandler, MissingParameterException, \
     ResourceNotFoundException
-from gcm import setup_logging, user_create, get_alias, add_alias, \
-    add_message, MySQL_schema_update, del_alias, user_get
+from gcm import setup_logging, GCMBackend, MySQL_schema_update
 
 
 class GCMHandler(RESTHandler):
@@ -19,18 +18,22 @@ class GCMHandler(RESTHandler):
     /messages        | Post a new message   | ø            | ø
     """
 
+    def __init__(self, *args, **kwargs):
+        self.gcm = GCMBackend()
+        RESTHandler.__init__(self, *args, **kwargs)
+
     def add_users(self, payload, **kwargs):
         if 'reg_id' not in kwargs:
             raise MissingParameterException('reg_id')
-        return user_create(kwargs['reg_id'])
+        return self.gcm.add_user(kwargs['reg_id'])
 
     def get_alias(self, **kwargs):
         if 'reg_id' not in kwargs:
             raise MissingParameterException('reg_id')
-        found, user = user_get(kwargs['reg_id'])
+        found, user = self.gcm.user_get(kwargs['reg_id'])
         if not found:
             raise ResourceNotFoundException('reg_id')
-        count, aliases = get_alias(user[0]['user_id'])
+        count, aliases = self.gcm.get_alias(user[0]['user_id'])
         if count == 0:
             aliases = []
         return [alias['alias'] for alias in aliases]
@@ -40,23 +43,23 @@ class GCMHandler(RESTHandler):
             raise MissingParameterException('reg_id')
         if 'alias' not in payload:
             raise MissingParameterException('alias')
-        found, user = user_get(kwargs['reg_id'])
+        found, user = self.gcm.user_get(kwargs['reg_id'])
         if not found:
             raise ResourceNotFoundException('reg_id')
-        success, new_id = add_alias(user[0]['user_id'],
-                                    payload['alias'])
+        success, new_id = self.gcm.add_alias(user[0]['user_id'],
+                                             payload['alias'])
         return {'created': success}
 
     def del_alias(self, **kwargs):
         if 'reg_id' not in kwargs:
             raise MissingParameterException('reg_id')
-        found, user = user_get(kwargs['reg_id'])
+        found, user = self.gcm.user_get(kwargs['reg_id'])
         if not found:
             raise ResourceNotFoundException('reg_id')
-        return del_alias(user[0]['user_id'], kwargs['alias'])
+        return self.gcm.del_alias(user[0]['user_id'], kwargs['alias'])
 
     def add_messages(self, payload, **kwargs):
-        return add_message(**payload)
+        return self.gcm.add_message(**payload)
 
 
 def parse_args(print_help=False):

@@ -88,85 +88,6 @@ def query(statement, args=None):
         c.close()
 
 
-def user_create(reg_id):
-    return query("""INSERT INTO user (registration_id, ctime, ltime)
-                         VALUES (%s, NOW(), NOW())
-        ON DUPLICATE KEY UPDATE ltime = VALUES(ltime)""",
-                 reg_id)
-
-
-def user_get(registration_id=None, user_id=None, alias=None):
-    where = []
-    args = []
-    if registration_id is not None:
-        where.append("registration_id = %s")
-        args.append(registration_id)
-    if user_id is not None:
-        where.append("user_id = %s")
-        args.append(user_id)
-    if alias is not None:
-        where.append("alias.alias = %s")
-        args.append(alias)
-    return query("""SELECT user_id, registration_id, ctime, ltime, alias.alias
-                      FROM user
-                 LEFT JOIN alias USING(user_id)
-                     WHERE """ + ' AND '.join(where), args)
-
-
-def add_alias(user_id, alias):
-    return query("""INSERT IGNORE INTO alias (user_id, alias)
-                    VALUES (%s, %s)""", (user_id, alias))
-
-
-def get_alias(user_id):
-    return query("""SELECT alias FROM alias
-                    WHERE user_id = %s""", user_id)
-
-
-def del_alias(user_id, alias):
-    return query("""DELETE FROM alias WHERE user_id = %s AND alias = %s""",
-                 (user_id, alias))
-
-
-def add_message(message, to_alias, collapse_key=None,
-                delay_while_idle=False):
-    success, message_id = query("""
-        INSERT INTO message (message, retry_after,
-                             collapse_key, delay_while_idle)
-             VALUES (%s, NOW(), %s, %s)""", (message, collapse_key,
-                                1 if delay_while_idle else 0))
-    qte, recipients = user_get(alias=to_alias)
-    for recipient in recipients:
-        query("""INSERT INTO recipient (message_id, user_id)
-                      VALUES (%s, %s)""",
-              (message_id, recipient['user_id']))
-    return message_id
-
-
-def messages_to_send():
-    q = """
-   SELECT message.message_id,
-          message.message,
-          message.collapse_key,
-          message.delay_while_idle,
-          GROUP_CONCAT(user.registration_id SEPARATOR 0x1D) AS registration_ids
-     FROM message
-     JOIN recipient USING (message_id)
-     JOIN user USING (user_id)
-    WHERE message.status = "todo"
-          AND retry_after < NOW()
-          AND user.valid = 1
- GROUP BY message.message_id"""
-    count, todo = query(q)
-    for each in todo:
-        each['registration_ids'] = each['registration_ids'].split('\x1D')
-    if count > 0:
-        ids = [str(message['message_id']) for message in todo]
-        query("UPDATE message SET status = 'done'"
-              "WHERE message_id IN (" + ','.join(ids) + ")")
-    return todo
-
-
 def update(table, update_set, conditions):
     sql_set = []
     sql_values = []
@@ -182,9 +103,83 @@ def update(table, update_set, conditions):
     return query(q, sql_values)
 
 
-def message_update(update_set, message_id):
-    return update('message', update_set, {'message_id': message_id})
+class GCMBackend():
+    def add_user(self, reg_id):
+        return query("""INSERT INTO user (registration_id, ctime, ltime)
+                             VALUES (%s, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE ltime = VALUES(ltime)""",
+                     reg_id)
 
+    def user_get(self, reg_id=None, user_id=None, alias=None):
+        where = []
+        args = []
+        if reg_id is not None:
+            where.append("registration_id = %s")
+            args.append(reg_id)
+        if user_id is not None:
+            where.append("user_id = %s")
+            args.append(user_id)
+        if alias is not None:
+            where.append("alias.alias = %s")
+            args.append(alias)
+        return query("""SELECT user_id, registration_id, ctime,
+                               ltime, alias.alias
+                          FROM user
+                     LEFT JOIN alias USING(user_id)
+                         WHERE """ + ' AND '.join(where), args)
 
-def user_update(update_set, registration_id):
-    return update('user', update_set, {'registration_id': registration_id})
+    def add_alias(self, user_id, alias):
+        return query("""INSERT IGNORE INTO alias (user_id, alias)
+                        VALUES (%s, %s)""", (user_id, alias))
+
+    def get_alias(self, user_id):
+        return query("""SELECT alias FROM alias
+                        WHERE user_id = %s""", user_id)
+
+    def del_alias(self, user_id, alias):
+        return query("""DELETE FROM alias WHERE user_id = %s AND alias = %s""",
+                     (user_id, alias))
+
+    def add_message(self, message, to_alias, collapse_key=None,
+                    delay_while_idle=False):
+        success, message_id = query("""
+            INSERT INTO message (message, retry_after,
+                                 collapse_key, delay_while_idle)
+                 VALUES (%s, NOW(), %s, %s)""", (message, collapse_key,
+                                    1 if delay_while_idle else 0))
+        qte, recipients = self.user_get(alias=to_alias)
+        for recipient in recipients:
+            query("""INSERT INTO recipient (message_id, user_id)
+                          VALUES (%s, %s)""",
+                  (message_id, recipient['user_id']))
+        return message_id
+
+    def messages_to_send(self):
+        q = """
+       SELECT message.message_id,
+              message.message,
+              message.collapse_key,
+              message.delay_while_idle,
+              GROUP_CONCAT(user.registration_id SEPARATOR 0x1D)
+                AS registration_ids
+         FROM message
+         JOIN recipient USING (message_id)
+         JOIN user USING (user_id)
+        WHERE message.status = "todo"
+              AND retry_after < NOW()
+              AND user.valid = 1
+     GROUP BY message.message_id"""
+        count, todo = query(q)
+        for each in todo:
+            each['registration_ids'] = each['registration_ids'].split('\x1D')
+        if count > 0:
+            ids = [str(message['message_id']) for message in todo]
+            query("UPDATE message SET status = 'done'"
+                  "WHERE message_id IN (" + ','.join(ids) + ")")
+        return todo
+
+    def message_update(self, update_set, message_id):
+        return update('message', update_set, {'message_id': message_id})
+
+    def user_update(self, update_set, reg_id):
+        return update('user', update_set, {'registration_id': reg_id})

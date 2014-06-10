@@ -22,6 +22,9 @@ class ResourceNotFoundException(RESTException):
 
 
 class RESTHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        BaseHTTPServer.BaseHTTPRequestHandler.__init__(self, *args, **kwargs)
+
     def log_exception(self):
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
