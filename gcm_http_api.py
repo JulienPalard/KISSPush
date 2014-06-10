@@ -1,133 +1,62 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 import BaseHTTPServer
-import cgi
-import json
-import urlparse
 from argparse import ArgumentParser
 import logging
-from gcm import setup_logging, user_create, alias_get, alias_create, \
-    message_create, MySQL_schema_update
+from RESTHandler import RESTHandler, MissingParameterException, \
+    ResourceNotFoundException
+from gcm import setup_logging, user_create, get_alias, add_alias, \
+    add_message, MySQL_schema_update, del_alias, user_get
 
 
-class GCMHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-    def do_GET(self):
-        params = urlparse.parse_qs(urlparse.urlparse(self.path).query)
-        if self.path.startswith("/alias"):
-            return self.alias_get(params)
-        if self.path == "/":
-            return self.index()
-        self.send_response(404, "Endpoint not found")
-        self.end_headers()
+class GCMHandler(RESTHandler):
+    """
+    Endpoints tree:
+    URL              | POST                 | GET          | DELETE
+    /users           | Register new reg_id  | ø            | ø
+    /aliases         | Create a new alias   | List aliases | Drop an alias
+    /messages        | Post a new message   | ø            | ø
+    """
 
-    def do_POST(self):
-        (content_type, dict) = cgi.parse_header(
-            self.headers.getheader('content-type'))
-        if content_type == 'multipart/form-data':
-            params = cgi.parse_multipart(self.rfile, dict)
-        elif content_type == 'application/x-www-form-urlencoded':
-            length = int(self.headers.getheader('content-length'))
-            params = cgi.parse_qs(self.rfile.read(length), keep_blank_values=1)
-        else:
-            params = {}
-        if self.path.startswith("/register"):
-            return self.register(params)
-        if self.path.startswith("/send"):
-            return self.send(params)
-        if self.path.startswith("/alias"):
-            return self.alias(params)
+    def add_users(self, payload, **kwargs):
+        if 'reg_id' not in kwargs:
+            raise MissingParameterException('reg_id')
+        return user_create(kwargs['reg_id'])
 
-        self.send_response(404, "Endpoint not found")
-        self.end_headers()
-
-    def index(self):
-        doc = {'endpoints': {'POST': {'/register': ['reg_id'],
-                                      '/send': ['msg', 'to', '[collapse_key]',
-                                                '[delay_while_idle]'],
-                                      '/alias': ['reg_id', 'alias']},
-                             'GET': {'/alias': ['reg_id']}}}
-        self.wfile.write(json.dumps(doc))
-
-    def param_get(self, params, name, default):
-        try:
-            value = params[name][0].strip()
-            if len(value) > 0:
-                return value
-        except (IndexError, KeyError):
-            pass
-        return default
-
-    def register(self, params):
-        """
-        Stores the registration id sent via the 'reg_id' parameter
-
-        Sample request:
-        curl -d "reg_id=test_id" http://localhost:8080/register
-        """
-        reg_id = self.param_get(params, 'reg_id', None)
-        if reg_id is None:
-            self.send_response(400, "Missing parameter reg_id")
-            self.end_headers()
-            return
-        self.send_response(200)
-        self.end_headers()
-        user_create(reg_id)
-
-    def alias_get(self, params):
-        reg_id = self.param_get(params, 'reg_id', None)
-        if reg_id is None:
-            self.send_response(400, "Missing parameter reg_id")
-            self.end_headers()
-            return
-        count, aliases = alias_get(reg_id)
+    def get_alias(self, **kwargs):
+        if 'reg_id' not in kwargs:
+            raise MissingParameterException('reg_id')
+        found, user = user_get(kwargs['reg_id'])
+        if not found:
+            raise ResourceNotFoundException('reg_id')
+        count, aliases = get_alias(user[0]['user_id'])
         if count == 0:
             aliases = []
-        alias_list = [alias['alias'] for alias in aliases]
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(json.dumps(alias_list))
+        return [alias['alias'] for alias in aliases]
 
-    def alias(self, params):
-        """
-        Stores the given alias for the goven registration id.
+    def add_alias(self, payload, **kwargs):
+        if 'reg_id' not in kwargs:
+            raise MissingParameterException('reg_id')
+        if 'alias' not in payload:
+            raise MissingParameterException('alias')
+        found, user = user_get(kwargs['reg_id'])
+        if not found:
+            raise ResourceNotFoundException('reg_id')
+        success, new_id = add_alias(user[0]['user_id'],
+                                    payload['alias'])
+        return {'created': success}
 
-        Sample request:
-        curl -d "reg_id=test_id&alias=me" http://localhost:8080/alias
-        """
-        reg_id = self.param_get(params, 'reg_id', None)
-        alias = self.param_get(params, 'alias', None)
-        if reg_id is None or alias is None:
-            self.send_response(400, "Missing parameter reg_id or alias")
-            self.end_headers()
-        if alias_create(reg_id, alias) is not None:
-            self.send_response(200)
-            self.end_headers()
-        else:
-            self.send_response(404, "reg_id not found")
-            self.end_headers()
+    def del_alias(self, **kwargs):
+        if 'reg_id' not in kwargs:
+            raise MissingParameterException('reg_id')
+        found, user = user_get(kwargs['reg_id'])
+        if not found:
+            raise ResourceNotFoundException('reg_id')
+        return del_alias(user[0]['user_id'], kwargs['alias'])
 
-    def send(self, params):
-        """
-        Message is specified by the 'msg' parameter.
-        Devices are specified indirectly by the alias given in the
-        `to` parameter.
-
-        Sample request:
-        curl -d "to=me&msg=Hello" http://localhost:8080/send
-        """
-
-        msg = self.param_get(params, 'msg', None)
-        to = self.param_get(params, 'to', None)
-        collapse_key = self.param_get(params, 'collapse_key', None)
-        delay_while_idle = self.param_get(params, 'delay_while_idle', False)
-        if msg is None or to is None:
-            self.send_response(400, "Missing parameter msg or to")
-            self.end_headers()
-            return
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(json.dumps(message_create(msg, to, collapse_key,
-                                                   delay_while_idle)))
+    def add_messages(self, payload, **kwargs):
+        return add_message(**payload)
 
 
 def parse_args(print_help=False):

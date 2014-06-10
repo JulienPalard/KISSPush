@@ -79,9 +79,11 @@ def query(statement, args=None):
         else:
             result = link.insert_id()
         return modified, result
-    except Exception:
-        logging.getLogger('kisspush').exception("While querying MySQL "
-                                                + statement)
+    except Exception as e:
+        logging.getLogger('kisspush').error("%s while querying statement"
+                                            " %s with %s ",
+                                            e, statement, repr(args))
+        raise
     finally:
         c.close()
 
@@ -111,26 +113,23 @@ def user_get(registration_id=None, user_id=None, alias=None):
                      WHERE """ + ' AND '.join(where), args)
 
 
-def alias_create(reg_id, alias):
-    found, user = user_get(reg_id)
-    if not found:
-        return None
+def add_alias(user_id, alias):
     return query("""INSERT IGNORE INTO alias (user_id, alias)
-                    VALUES (%s, %s)""",
-                 (user[0]['user_id'], alias))
+                    VALUES (%s, %s)""", (user_id, alias))
 
 
-def alias_get(reg_id):
-    found, user = user_get(reg_id)
-    if not found:
-        return 0, None
+def get_alias(user_id):
     return query("""SELECT alias FROM alias
-                    WHERE user_id = %s""",
-                 (user[0]['user_id']))
+                    WHERE user_id = %s""", user_id)
 
 
-def message_create(message, to_alias, collapse_key=None,
-                   delay_while_idle=False):
+def del_alias(user_id, alias):
+    return query("""DELETE FROM alias WHERE user_id = %s AND alias = %s""",
+                 (user_id, alias))
+
+
+def add_message(message, to_alias, collapse_key=None,
+                delay_while_idle=False):
     success, message_id = query("""
         INSERT INTO message (message, retry_after,
                              collapse_key, delay_while_idle)
