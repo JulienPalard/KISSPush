@@ -6,11 +6,10 @@ from config import config
 from argparse import ArgumentParser
 import logging
 from time import sleep
-from gcm import messages_to_send, setup_logging, MySQL_schema_update, \
-    message_update, user_update
+from gcm import GCMBackend, setup_logging, MySQL_schema_update
 
 
-class GCM_Pusher():
+class GCM_Pusher(GCMBackend):
     def __init__(self):
         self.backoff = 0
         self.log = logging.getLogger('kisspush')
@@ -30,7 +29,7 @@ class GCM_Pusher():
                     "Unhandled exception while pushing messages to GCM")
 
     def push_all(self):
-        todo = messages_to_send()
+        todo = self.messages_to_send()
         for message in todo:
             try:
                 self.push_one(message)
@@ -59,8 +58,9 @@ class GCM_Pusher():
                 # the original ID is not part of the result, so you
                 # need to obtain it from the list of registration_ids
                 # passed in the request (using the same index).
-                user_update({'registration_id': result['registration_id']},
-                            registration_id=registration_id)
+                self.log.info("reg_id changed from {} to {}".format(
+                              result['registration_id'], registration_id))
+                self.reg_id_changed(result['registration_id'], registration_id)
         elif 'error' in result:  # Otherwise, get the value of error:
             if result['error'] == 'Unavailable':
                 # If it is Unavailable, you could retry to send it in
@@ -74,8 +74,8 @@ class GCM_Pusher():
                 # it does not have a broadcast receiver configured to
                 # receive com.google.android.c2dm.intent.RECEIVE
                 # intents.
-                user_update({'valid': 0},
-                            registration_id=registration_id)
+                self.user_update({'valid': 0},
+                                 registration_id)
             elif result['error'] == "MissingRegistration":
                 self.log.error("Oops, missing registration id in message %d ?",
                                message_id)
@@ -84,15 +84,15 @@ class GCM_Pusher():
                                "Dropping registration_id %s, won't work again "
                                "if you switched sender_id.",
                                message_id, registration_id)
-                user_update({'valid': 0},
-                            registration_id=registration_id)
+                self.user_update({'valid': 0},
+                                 registration_id)
             elif result['error'] == "NotRegistered":
                 self.log.error("Oops, registration_id seems not registered, "
                                "in message %d."
                                "Dropping registration_id %s.",
                                message_id, registration_id)
-                user_update({'valid': 0},
-                            registration_id=registration_id)
+                self.user_update({'valid': 0},
+                                 registration_id)
             elif result['error'] == 'MessageTooBig':
                 self.log.error("Oops, message %d too big.", message_id)
             elif result['error'] == 'InvalidTtl.':
@@ -106,9 +106,6 @@ class GCM_Pusher():
             elif result['error'] == 'InternalServerError':
                 self.log.error("Oops, got an Internal Server Error from GCM, "
                                "for message %d.", message_id)
-
-
-
             else:
                 # Otherwise, there is something wrong in the
                 # registration ID passed in the request; it is
@@ -118,8 +115,8 @@ class GCM_Pusher():
                 # possible error values.
                 self.log.error("%s from GCM servers, "
                                "marking user as invalid.", result['error'])
-                user_update({'valid': 0},
-                            registration_id=registration_id)
+                self.user_update({'valid': 0},
+                                 registration_id)
 
     def push_one(self, message):
         data = {'registration_ids': message['registration_ids'],
@@ -137,9 +134,10 @@ class GCM_Pusher():
             self.log.exception("While sending a message to GCM")
         else:
             parsed_response = response.json()
-            message_update({'multicast_id': parsed_response['multicast_id']},
-                           message_id=message['message_id'])
-
+            self.message_update({'multicast_id':
+                                 parsed_response['multicast_id']},
+                                message_id=message['message_id'])
+            self.log.info(response.content)
             # If the value of failure and canonical_ids is 0, it's not
             # necessary to parse the remainder of the
             # response.
@@ -151,7 +149,6 @@ class GCM_Pusher():
                 for i, result in enumerate(parsed_response['results']):
                     self.handle_result(message['message_id'],
                                        message['registration_ids'][i], result)
-            self.log.info(response.content)
 
 
 def parse_args(print_help=False):

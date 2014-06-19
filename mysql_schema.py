@@ -60,5 +60,8 @@ ALTER TABLE message ADD multicast_id VARCHAR(64) NULL;
                 """
 ALTER TABLE user ADD valid INT(1) NOT NULL DEFAULT 1;
 
+""",
+                """
+ALTER TABLE user DROP INDEX `ri`, ADD UNIQUE INDEX `ri` (`registration_id`(767));
 """
                 ]

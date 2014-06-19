@@ -1,65 +1,121 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import BaseHTTPServer
 from argparse import ArgumentParser
 import logging
-from RESTHandler import RESTHandler, MissingParameterException, \
-    ResourceNotFoundException
-from gcm import setup_logging, GCMBackend, MySQL_schema_update
+import json
+from gcm import GCMBackend
+import cherrypy
+from cherrypy import HTTPError
 
 
-class GCMHandler(RESTHandler):
-    """
-    Endpoints tree:
-    URL              | POST                 | GET          | DELETE
-    /users           | Register new reg_id  | ø            | ø
-    /aliases         | Create a new alias   | List aliases | Drop an alias
-    /messages        | Post a new message   | ø            | ø
-    """
+"""
+Endpoints tree:
+│
+├── /user
+│   ├── POST  Register the given reg_id
+|   ├── /REG_ID
+|   |   └── PUT   Register the given reg_id
+│   └── /subscription
+│       ├── GET    List chans REG_ID is listening
+│       ├── PUT    Replace the whole subscriptions
+│       ├── POST   Subscribe to a new channel
+│       ├── DELETE Drop all subscriptions
+│       └── /CHANNEL
+│           ├── GET    Get infos about this subscription
+│           ├── PUT    Subscribe to the given channel
+│           └── DELETE Unsubscribe from this channel
+└── /channel
+    └── /CHANNEL
+        └── POST Send a message to this channel
 
-    def __init__(self, *args, **kwargs):
-        self.gcm = GCMBackend()
-        RESTHandler.__init__(self, *args, **kwargs)
+"""
 
-    def add_users(self, payload, **kwargs):
-        if 'reg_id' not in kwargs:
-            raise MissingParameterException('reg_id')
-        return self.gcm.add_user(kwargs['reg_id'])
 
-    def get_alias(self, **kwargs):
-        if 'reg_id' not in kwargs:
-            raise MissingParameterException('reg_id')
-        found, user = self.gcm.user_get(kwargs['reg_id'])
+def json_datetime_handler(obj):
+    if hasattr(obj, 'isoformat'):
+        return obj.isoformat()
+
+
+@cherrypy.popargs('channel')
+class Channel(object):
+    exposed = True
+
+    @cherrypy.tools.accept(media='text/plain')
+    def POST(self, channel):
+        gcm = cherrypy.thread_data.gcm
+        content_length = min(int(cherrypy.request.headers['Content-Length']),
+                             4096)
+        rawbody = cherrypy.request.body.read(content_length)
+        if len(rawbody) == 0:
+            return json.dumps({'error': 'Empty body.'})
+        return json.dumps(gcm.add_message(rawbody, channel))
+
+
+@cherrypy.popargs('channel')
+class Subscription(object):
+    exposed = True
+
+    def list_subscriptions(self, reg_id):
+        gcm = cherrypy.thread_data.gcm
+        found, user = gcm.user_get(reg_id)
         if not found:
-            raise ResourceNotFoundException('reg_id')
-        count, aliases = self.gcm.get_alias(user[0]['user_id'])
+            raise HTTPError(404, 'reg_id not found')
+        count, aliases = gcm.get_alias(user[0]['user_id'])
         if count == 0:
             aliases = []
         return [alias['alias'] for alias in aliases]
 
-    def add_alias(self, payload, **kwargs):
-        if 'reg_id' not in kwargs:
-            raise MissingParameterException('reg_id')
-        if 'alias' not in payload:
-            raise MissingParameterException('alias')
-        found, user = self.gcm.user_get(kwargs['reg_id'])
-        if not found:
-            raise ResourceNotFoundException('reg_id')
-        success, new_id = self.gcm.add_alias(user[0]['user_id'],
-                                             payload['alias'])
-        return {'created': success}
+    def GET(self, reg_id, channel=None):
+        if channel is None:
+            return json.dumps(self.list_subscriptions(reg_id))
+        else:
+            # May retrieve info about this subscription ?
+            return json.dumps({'error': 'No info for a subscription yet.'})
 
-    def del_alias(self, **kwargs):
-        if 'reg_id' not in kwargs:
-            raise MissingParameterException('reg_id')
-        found, user = self.gcm.user_get(kwargs['reg_id'])
+    def PUT(self, reg_id, channel=None):
+        if channel is None:
+            # May create a whole bunch of given channels
+            return json.dumps({'error': 'Multi channel subscription '
+                               'unsupported'})
+        gcm = cherrypy.thread_data.gcm
+        found, user = gcm.user_get(reg_id)
         if not found:
-            raise ResourceNotFoundException('reg_id')
-        return self.gcm.del_alias(user[0]['user_id'], kwargs['alias'])
+            raise HTTPError(404, 'reg_id not found')
+        success, new_id = gcm.add_alias(user[0]['user_id'], channel)
+        return json.dumps({'created': success})
 
-    def add_messages(self, payload, **kwargs):
-        return self.gcm.add_message(**payload)
+    def DELETE(self, reg_id, channel=None):
+        if channel is None:
+            # May delete the entier list of subscription
+            return json.dumps({'error': 'Multi channel deletion '
+                               'unsupported yet'})
+        gcm = cherrypy.thread_data.gcm
+        found, user = gcm.user_get(reg_id)
+        if not found:
+            raise HTTPError(404, 'reg_id not found')
+        return json.dumps(gcm.del_alias(user[0]['user_id'], channel))
+
+
+@cherrypy.popargs('reg_id')
+class User(object):
+    exposed = True
+    subscription = Subscription()
+
+    def PUT(self, reg_id):
+        return json.dumps(cherrypy.thread_data.gcm.add_user(reg_id))
+
+    def POST(self, reg_id):
+        return json.dumps(cherrypy.thread_data.gcm.add_user(reg_id))
+
+
+class KISSPushHTTP(object):
+    exposed = True
+    user = User()
+    channel = Channel()
+
+    def GET(self):
+        return 'KISSPush'
 
 
 def parse_args(print_help=False):
@@ -80,10 +136,14 @@ def parse_args(print_help=False):
         parser.print_help()
     return parser.parse_args()
 
-
 if __name__ == '__main__':
+    def on_new_thread(thread_id):
+        cherrypy.thread_data.gcm = GCMBackend()
     args = parse_args()
-    logger = setup_logging(args.verbose, args.syslog)
-    MySQL_schema_update()
-    server = BaseHTTPServer.HTTPServer(('', args.port), GCMHandler)
-    server.serve_forever()
+    cherrypy.config.update({'server.socket_port': args.port,
+                            'server.socket_host': '0.0.0.0'})
+    cherrypy.engine.subscribe('start_thread', on_new_thread)
+    cherrypy.quickstart(
+        KISSPushHTTP(),
+        config={'/': {'request.dispatch':
+                          cherrypy.dispatch.MethodDispatcher()}})

@@ -80,10 +80,9 @@ def query(statement, args=None):
             result = link.insert_id()
         return modified, result
     except Exception as e:
-        logging.getLogger('kisspush').error("%s while querying statement"
-                                            " %s with %s ",
-                                            e, statement, repr(args))
-        raise
+        logging.getLogger('kisspush').exception("%s while querying statement"
+                                                " %s with %s ",
+                                                e, statement, repr(args))
     finally:
         c.close()
 
@@ -113,7 +112,10 @@ class GCMBackend():
     def user_get(self, reg_id=None, user_id=None, alias=None):
         where = []
         args = []
+        if reg_id is None and user_id is None and alias is None:
+            raise Exception('Missing parameter')
         if reg_id is not None:
+            self.add_user(reg_id)
             where.append("registration_id = %s")
             args.append(reg_id)
         if user_id is not None:
@@ -180,6 +182,20 @@ class GCMBackend():
 
     def message_update(self, update_set, message_id):
         return update('message', update_set, {'message_id': message_id})
+
+    def reg_id_changed(self, old_reg_id, new_reg_id):
+        self.add_user(new_reg_id)
+        query("""
+        INSERT IGNORE INTO alias
+               SELECT (SELECT user_id FROM user
+                        WHERE registration_id = %s) AS user_id,
+               alias
+          FROM user AS old_user
+          JOIN alias AS old_alias USING (user_id)
+         WHERE registration_id = %s
+""", (new_reg_id, old_reg_id))
+        query("""UPDATE user SET valid = 0
+                  WHERE registration_id = %s""", old_reg_id)
 
     def user_update(self, update_set, reg_id):
         return update('user', update_set, {'registration_id': reg_id})
