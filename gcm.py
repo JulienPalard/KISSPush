@@ -161,15 +161,15 @@ class GCMBackendChannel():
     def __init__(self, gcm):
         self.gcm = gcm
 
-    def add(self, user_id, channel):
+    def subscribe(self, user_id, channel):
         return query("""INSERT IGNORE INTO channel (user_id, name)
                         VALUES (%s, %s)""", (user_id, channel))
 
-    def get(self, user_id):
+    def list_subscriptions(self, user_id):
         return query("""SELECT name FROM channel
                         WHERE user_id = %s""", user_id)
 
-    def delete(self, user_id, channel):
+    def unsubscribe(self, user_id, channel):
         return query("""DELETE FROM channel WHERE user_id = %s AND name = %s""",
                      (user_id, channel))
 

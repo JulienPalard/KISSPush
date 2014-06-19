@@ -61,7 +61,7 @@ class Subscription(object):
         found, user = gcm.user.get(reg_id)
         if not found:
             raise HTTPError(404, 'reg_id not found')
-        count, channels = gcm.channel.get(user[0]['user_id'])
+        count, channels = gcm.channel.list_subscriptions(user[0]['user_id'])
         if count == 0:
             channels = []
         return [channel['name'] for channel in channels]
@@ -82,7 +82,7 @@ class Subscription(object):
         found, user = gcm.user.get(reg_id)
         if not found:
             raise HTTPError(404, 'reg_id not found')
-        success, new_id = gcm.channel.add(user[0]['user_id'], channel)
+        success, new_id = gcm.channel.subscribe(user[0]['user_id'], channel)
         return json.dumps({'created': success})
 
     def DELETE(self, reg_id, channel=None):
@@ -94,7 +94,7 @@ class Subscription(object):
         found, user = gcm.user.get(reg_id)
         if not found:
             raise HTTPError(404, 'reg_id not found')
-        return json.dumps(gcm.channel.delete(user[0]['user_id'], channel))
+        return json.dumps(gcm.channel.unsubscribe(user[0]['user_id'], channel))
 
 
 @cherrypy.popargs('reg_id')
