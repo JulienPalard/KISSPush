@@ -63,5 +63,11 @@ ALTER TABLE user ADD valid INT(1) NOT NULL DEFAULT 1;
 """,
                 """
 ALTER TABLE user DROP INDEX `ri`, ADD UNIQUE INDEX `ri` (`registration_id`(767));
+""",
+                """
+RENAME TABLE alias TO channel
+""",
+                """
+ALTER TABLE channel DROP PRIMARY KEY, CHANGE COLUMN `alias` `name` VARCHAR(191) COMMENT "767 / 4, max length for index in utf8mb4", ADD PRIMARY KEY (`name`, user_id);
 """
                 ]

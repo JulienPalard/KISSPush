@@ -5,6 +5,7 @@ from config import config
 import logging
 import warnings
 import MySQLdb
+import sys
 
 """
 The big picture:
@@ -58,8 +59,13 @@ def MySQL_schema_update():
         stmt = "SELECT 1 FROM schema_history WHERE statement = %s"
         c.execute(stmt, statement)
         if c.fetchone() is None:
-            c.execute(statement)
-            c.execute("INSERT INTO schema_history VALUES(%s)", statement)
+            try:
+                c.execute(statement)
+                c.execute("INSERT INTO schema_history VALUES(%s)", statement)
+            except Exception as ex:
+                logging.error("Got an exeption executing {}".format(statement))
+                logging.exception(ex)
+                sys.exit(1)
     c.close()
 
 
@@ -102,61 +108,91 @@ def update(table, update_set, conditions):
     return query(q, sql_values)
 
 
-class GCMBackend():
-    def add_user(self, reg_id):
+class GCMBackendUser():
+    def __init__(self, gcm):
+        self.gcm = gcm
+
+    def add(self, reg_id):
         return query("""INSERT INTO user (registration_id, ctime, ltime)
                              VALUES (%s, NOW(), NOW())
             ON DUPLICATE KEY UPDATE ltime = VALUES(ltime)""",
                      reg_id)
 
-    def user_get(self, reg_id=None, user_id=None, alias=None):
+    def get(self, reg_id=None, user_id=None, channel=None):
         where = []
         args = []
-        if reg_id is None and user_id is None and alias is None:
+        if reg_id is None and user_id is None and channel is None:
             raise Exception('Missing parameter')
         if reg_id is not None:
-            self.add_user(reg_id)
+            self.add(reg_id)
             where.append("registration_id = %s")
             args.append(reg_id)
         if user_id is not None:
             where.append("user_id = %s")
             args.append(user_id)
-        if alias is not None:
-            where.append("alias.alias = %s")
-            args.append(alias)
+        if channel is not None:
+            where.append("channel.name = %s")
+            args.append(channel)
         return query("""SELECT user_id, registration_id, ctime,
-                               ltime, alias.alias
+                               ltime, channel.name AS channel
                           FROM user
-                     LEFT JOIN alias USING(user_id)
+                     LEFT JOIN channel USING(user_id)
                          WHERE """ + ' AND '.join(where), args)
 
-    def add_alias(self, user_id, alias):
-        return query("""INSERT IGNORE INTO alias (user_id, alias)
-                        VALUES (%s, %s)""", (user_id, alias))
+    def reg_id_changed(self, old_reg_id, new_reg_id):
+        self.add(new_reg_id)
+        query("""
+        INSERT IGNORE INTO channel
+               SELECT (SELECT user_id FROM user
+                        WHERE registration_id = %s) AS user_id,
+               channel
+          FROM user AS old_user
+          JOIN channel AS old_channel USING (user_id)
+         WHERE registration_id = %s
+""", (new_reg_id, old_reg_id))
+        query("""UPDATE user SET valid = 0
+                  WHERE registration_id = %s""", old_reg_id)
 
-    def get_alias(self, user_id):
-        return query("""SELECT alias FROM alias
+    def update(self, update_set, reg_id):
+        return update('user', update_set, {'registration_id': reg_id})
+
+
+class GCMBackendChannel():
+    def __init__(self, gcm):
+        self.gcm = gcm
+
+    def add(self, user_id, channel):
+        return query("""INSERT IGNORE INTO channel (user_id, name)
+                        VALUES (%s, %s)""", (user_id, channel))
+
+    def get(self, user_id):
+        return query("""SELECT name FROM channel
                         WHERE user_id = %s""", user_id)
 
-    def del_alias(self, user_id, alias):
-        return query("""DELETE FROM alias WHERE user_id = %s AND alias = %s""",
-                     (user_id, alias))
+    def delete(self, user_id, channel):
+        return query("""DELETE FROM channel WHERE user_id = %s AND name = %s""",
+                     (user_id, channel))
 
-    def add_message(self, message, to_alias, collapse_key=None,
-                    delay_while_idle=False):
+
+class GCMBackendMessage():
+    def __init__(self, gcm):
+        self.gcm = gcm
+
+    def add(self, message, to_channel, collapse_key=None,
+            delay_while_idle=False):
         success, message_id = query("""
             INSERT INTO message (message, retry_after,
                                  collapse_key, delay_while_idle)
                  VALUES (%s, NOW(), %s, %s)""", (message, collapse_key,
                                     1 if delay_while_idle else 0))
-        qte, recipients = self.user_get(alias=to_alias)
+        qte, recipients = self.gcm.user.get(channel=to_channel)
         for recipient in recipients:
             query("""INSERT INTO recipient (message_id, user_id)
                           VALUES (%s, %s)""",
                   (message_id, recipient['user_id']))
         return message_id
 
-    def messages_to_send(self):
+    def to_send(self):
         q = """
        SELECT message.message_id,
               message.message,
@@ -180,22 +216,12 @@ class GCMBackend():
                   "WHERE message_id IN (" + ','.join(ids) + ")")
         return todo
 
-    def message_update(self, update_set, message_id):
+    def update(self, update_set, message_id):
         return update('message', update_set, {'message_id': message_id})
 
-    def reg_id_changed(self, old_reg_id, new_reg_id):
-        self.add_user(new_reg_id)
-        query("""
-        INSERT IGNORE INTO alias
-               SELECT (SELECT user_id FROM user
-                        WHERE registration_id = %s) AS user_id,
-               alias
-          FROM user AS old_user
-          JOIN alias AS old_alias USING (user_id)
-         WHERE registration_id = %s
-""", (new_reg_id, old_reg_id))
-        query("""UPDATE user SET valid = 0
-                  WHERE registration_id = %s""", old_reg_id)
 
-    def user_update(self, update_set, reg_id):
-        return update('user', update_set, {'registration_id': reg_id})
+class GCMBackend():
+    def __init__(self):
+        self.user = GCMBackendUser(self)
+        self.channel = GCMBackendChannel(self)
+        self.message = GCMBackendMessage(self)

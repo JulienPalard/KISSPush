@@ -49,7 +49,7 @@ class Channel(object):
         rawbody = cherrypy.request.body.read(content_length)
         if len(rawbody) == 0:
             return json.dumps({'error': 'Empty body.'})
-        return json.dumps(gcm.add_message(rawbody, channel))
+        return json.dumps(gcm.message.add(rawbody, channel))
 
 
 @cherrypy.popargs('channel')
@@ -58,13 +58,13 @@ class Subscription(object):
 
     def list_subscriptions(self, reg_id):
         gcm = cherrypy.thread_data.gcm
-        found, user = gcm.user_get(reg_id)
+        found, user = gcm.user.get(reg_id)
         if not found:
             raise HTTPError(404, 'reg_id not found')
-        count, aliases = gcm.get_alias(user[0]['user_id'])
+        count, channels = gcm.channel.get(user[0]['user_id'])
         if count == 0:
-            aliases = []
-        return [alias['alias'] for alias in aliases]
+            channels = []
+        return [channel['name'] for channel in channels]
 
     def GET(self, reg_id, channel=None):
         if channel is None:
@@ -79,10 +79,10 @@ class Subscription(object):
             return json.dumps({'error': 'Multi channel subscription '
                                'unsupported'})
         gcm = cherrypy.thread_data.gcm
-        found, user = gcm.user_get(reg_id)
+        found, user = gcm.user.get(reg_id)
         if not found:
             raise HTTPError(404, 'reg_id not found')
-        success, new_id = gcm.add_alias(user[0]['user_id'], channel)
+        success, new_id = gcm.channel.add(user[0]['user_id'], channel)
         return json.dumps({'created': success})
 
     def DELETE(self, reg_id, channel=None):
@@ -91,10 +91,10 @@ class Subscription(object):
             return json.dumps({'error': 'Multi channel deletion '
                                'unsupported yet'})
         gcm = cherrypy.thread_data.gcm
-        found, user = gcm.user_get(reg_id)
+        found, user = gcm.user.get(reg_id)
         if not found:
             raise HTTPError(404, 'reg_id not found')
-        return json.dumps(gcm.del_alias(user[0]['user_id'], channel))
+        return json.dumps(gcm.channel.delete(user[0]['user_id'], channel))
 
 
 @cherrypy.popargs('reg_id')
@@ -103,10 +103,10 @@ class User(object):
     subscription = Subscription()
 
     def PUT(self, reg_id):
-        return json.dumps(cherrypy.thread_data.gcm.add_user(reg_id))
+        return json.dumps(cherrypy.thread_data.gcm.user.add(reg_id))
 
     def POST(self, reg_id):
-        return json.dumps(cherrypy.thread_data.gcm.add_user(reg_id))
+        return json.dumps(cherrypy.thread_data.gcm.user.add(reg_id))
 
 
 class KISSPushHTTP(object):
