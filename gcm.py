@@ -125,33 +125,35 @@ class GCMBackendUser():
             raise Exception('Missing parameter')
         if reg_id is not None:
             self.add(reg_id)
-            where.append("registration_id = %s")
+            where.append("user.registration_id = %s")
             args.append(reg_id)
         if user_id is not None:
-            where.append("user_id = %s")
+            where.append("user.user_id = %s")
             args.append(user_id)
         if channel is not None:
             where.append("channel.name = %s")
             args.append(channel)
-        return query("""SELECT user_id, registration_id, ctime,
-                               ltime, channel.name AS channel
+        return query("""SELECT user.user_id, user.registration_id, user.ctime,
+                               user.ltime, channel.name AS channel
                           FROM user
-                     LEFT JOIN channel USING(user_id)
+                     LEFT JOIN subscription USING(user_id)
+                     LEFT JOIN channel USING(channel_id)
                          WHERE """ + ' AND '.join(where), args)
 
     def reg_id_changed(self, old_reg_id, new_reg_id):
         self.add(new_reg_id)
-        query("""
-        INSERT IGNORE INTO channel
-               SELECT (SELECT user_id FROM user
-                        WHERE registration_id = %s) AS user_id,
-               channel
-          FROM user AS old_user
-          JOIN channel AS old_channel USING (user_id)
-         WHERE registration_id = %s
-""", (new_reg_id, old_reg_id))
-        query("""UPDATE user SET valid = 0
-                  WHERE registration_id = %s""", old_reg_id)
+        found_old, old_user = self.get(old_reg_id)
+        found_new, new_user = self.get(new_reg_id)
+        if found_old and found_new:
+            query("""
+            INSERT IGNORE INTO subscription
+                   SELECT %s, channel_id FROM subscription
+                    WHERE user_id = %s
+            """, (new_user[0]['user_id'], old_user[0]['user_id']))
+        if found_old:
+            query("""UPDATE user SET valid = 0
+                      WHERE user_id = %s""",
+                  old_user[0]['user_id'])
 
     def update(self, update_set, reg_id):
         return update('user', update_set, {'registration_id': reg_id})
@@ -161,17 +163,35 @@ class GCMBackendChannel():
     def __init__(self, gcm):
         self.gcm = gcm
 
-    def subscribe(self, user_id, channel):
-        return query("""INSERT IGNORE INTO channel (user_id, name)
-                        VALUES (%s, %s)""", (user_id, channel))
+    def create(self, name):
+        return query("""INSERT INTO channel(name) VALUES (%s)
+                        ON DUPLICATE KEY UPDATE
+                        channel_id = LAST_INSERT_ID(channel_id)""",
+                     name)
+
+    def subscribe(self, user_id, name):
+        existed, channel_id = self.create(name)
+        return query("""INSERT IGNORE INTO subscription (user_id, channel_id)
+                        VALUES (%s, %s)""",
+                     (user_id, channel_id))
 
     def list_subscriptions(self, user_id):
-        return query("""SELECT name FROM channel
-                        WHERE user_id = %s""", user_id)
+        return query("""SELECT name FROM subscription
+                          JOIN channel USING (channel_id)
+                        WHERE user_id = %s""",
+                     user_id)
 
-    def unsubscribe(self, user_id, channel):
-        return query("""DELETE FROM channel WHERE user_id = %s AND name = %s""",
-                     (user_id, channel))
+    def unsubscribe(self, user_id, name):
+        existed, channel_id = self.create(name)
+        return query("""DELETE FROM subscription
+                        WHERE user_id = %s AND channel_id = %s""",
+                     (user_id, channel_id))
+
+    def list_messages(self, channel):
+        return query("""SELECT message FROM message
+                        JOIN channel USING (channel_id)
+                        WHERE channel.name = %s""",
+                     channel)
 
 
 class GCMBackendMessage():
@@ -180,11 +200,12 @@ class GCMBackendMessage():
 
     def add(self, message, to_channel, collapse_key=None,
             delay_while_idle=False):
+        existed, channel_id = self.gcm.channel.create(to_channel)
         success, message_id = query("""
             INSERT INTO message (message, retry_after,
-                                 collapse_key, delay_while_idle)
-                 VALUES (%s, NOW(), %s, %s)""", (message, collapse_key,
-                                    1 if delay_while_idle else 0))
+                                 collapse_key, delay_while_idle, channel_id)
+                 VALUES (%s, NOW(), %s, %s, %s)""", (message, collapse_key,
+                                    1 if delay_while_idle else 0, channel_id))
         qte, recipients = self.gcm.user.get(channel=to_channel)
         for recipient in recipients:
             query("""INSERT INTO recipient (message_id, user_id)

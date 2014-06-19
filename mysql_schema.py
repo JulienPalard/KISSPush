@@ -69,5 +69,38 @@ RENAME TABLE alias TO channel
 """,
                 """
 ALTER TABLE channel DROP PRIMARY KEY, CHANGE COLUMN `alias` `name` VARCHAR(191) COMMENT "767 / 4, max length for index in utf8mb4", ADD PRIMARY KEY (`name`, user_id);
+""",
+                """
+RENAME TABLE channel TO tmp;
+""",
+                """
+CREATE TABLE channel
+(
+    channel_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(191) COMMENT "767 / 4, max length for index in utf8mb4",
+    PRIMARY KEY (channel_id),
+    UNIQUE INDEX (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+""",
+                """
+INSERT IGNORE INTO channel (name) SELECT name FROM tmp
+""",
+                """
+CREATE TABLE subscription
+(
+    user_id INT UNSIGNED NOT NULL,
+    channel_id INT UNSIGNED NOT NULL,
+    PRIMARY KEY (user_id, channel_id),
+    UNIQUE INDEX (channel_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+""",
+                """
+INSERT INTO subscription SELECT user_id, channel_id FROM tmp JOIN channel USING(name);
+""",
+                """
+DROP TABLE tmp;
+""",
+                """
+ALTER TABLE message ADD COLUMN channel_id INT UNSIGNED NOT NULL DEFAULT 0;
 """
                 ]
