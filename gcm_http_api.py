@@ -41,6 +41,11 @@ def json_datetime_handler(obj):
 class Channel(object):
     exposed = True
 
+    def GET(self, channel):
+        gcm = cherrypy.thread_data.gcm
+        return json.dumps(gcm.channel.list_messages(channel),
+                          default=json_datetime_handler)
+
     @cherrypy.tools.accept(media='text/plain')
     def POST(self, channel):
         gcm = cherrypy.thread_data.gcm

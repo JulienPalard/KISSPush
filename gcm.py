@@ -190,7 +190,9 @@ class GCMBackendChannel():
     def list_messages(self, channel):
         return query("""SELECT message, ctime FROM message
                         JOIN channel USING (channel_id)
-                        WHERE channel.name = %s""",
+                        WHERE channel.name = %s
+                        ORDER BY ctime DESC
+                        LIMIT 10""",
                      channel)
 
 
