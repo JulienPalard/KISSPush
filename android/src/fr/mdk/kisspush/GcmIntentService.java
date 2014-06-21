@@ -16,7 +16,7 @@
 
 package fr.mdk.kisspush;
 
-import com.google.android.gcm.demo.app.R;
+import fr.mdk.kisspush.R;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 
 import android.app.IntentService;

@@ -19,10 +19,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.http.Header;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -35,15 +38,20 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.TextView;
 
-import com.google.android.gcm.demo.app.R;
+import fr.mdk.kisspush.R;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
+import com.loopj.android.http.JsonHttpResponseHandler;
+import com.loopj.android.http.RequestParams;
 
 /**
  * Main UI for the demo app.
@@ -76,6 +84,20 @@ public class KISSPush extends ActionBarActivity {
 		setContentView(R.layout.main);
 		mDisplay = (ListView) findViewById(R.id.display);
 		context = getApplicationContext();
+
+		mDisplay.setOnItemClickListener(new OnItemClickListener() {
+			@Override
+			public void onItemClick(AdapterView<?> parent, View view,
+					int position, long id) {
+				kiss_push_cli.delete_alias(((TextView) view).getText()
+						.toString(), new JsonHttpResponseHandler() {
+					@Override
+					public void onSuccess(int arg0, Header[] arg1, byte[] arg2) {
+						getAliases();
+					}
+				});
+			}
+		});
 
 		if (checkPlayServices()) {
 			gcm = GoogleCloudMessaging.getInstance(this);
@@ -129,9 +151,16 @@ public class KISSPush extends ActionBarActivity {
 					public void onClick(DialogInterface dialog, int id) {
 						// get user input and set it to
 						// result
-						kiss_push_cli.add_alias(input.getText().toString());
-						// editTextMainScreen.setText(input
-						// .getText());
+						if (input.getText().toString().length() > 0) {
+							kiss_push_cli.add_alias(input.getText().toString(),
+									new JsonHttpResponseHandler() {
+										@Override
+										public void onSuccess(int arg0,
+												Header[] arg1, byte[] arg2) {
+											getAliases();
+										}
+									});
+						}
 					}
 				})
 				.setNegativeButton("Cancel",

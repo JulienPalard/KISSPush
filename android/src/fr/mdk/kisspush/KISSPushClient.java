@@ -38,23 +38,44 @@ public class KISSPushClient {
 
 	public void get(String url, RequestParams params,
 			AsyncHttpResponseHandler responseHandler) {
-		client.get(getAbsoluteUrl(url), params, responseHandler);
+		if (params == null)
+			client.get(getAbsoluteUrl(url), responseHandler);
+		else
+			client.get(getAbsoluteUrl(url), params, responseHandler);
 	}
 
 	public void post(String url, RequestParams params,
 			AsyncHttpResponseHandler responseHandler) {
-		client.post(getAbsoluteUrl(url), params, responseHandler);
+		if (params == null)
+			client.post(getAbsoluteUrl(url), responseHandler);
+		else
+			client.post(getAbsoluteUrl(url), params, responseHandler);
 	}
 
-	public void add_alias(String alias)
-	{
-		RequestParams add_alias_params = new RequestParams();
-		add_alias_params.add("reg_id", reg_id);
-		add_alias_params.add("alias", alias);
-		this.post("alias", add_alias_params,
-				new JsonHttpResponseHandler(){
+	public void put(String url, RequestParams params,
+			AsyncHttpResponseHandler responseHandler) {
+		if (params == null)
+			client.put(getAbsoluteUrl(url), responseHandler);
+		else
+			client.put(getAbsoluteUrl(url), params, responseHandler);
+	}
 
-		});
+	public void delete(String url, RequestParams params,
+			AsyncHttpResponseHandler responseHandler) {
+		if (params == null)
+			client.delete(null, getAbsoluteUrl(url), responseHandler);
+		else
+			client.delete(null, getAbsoluteUrl(url), null, params, responseHandler);
+	}
+
+	public void add_alias(String alias, JsonHttpResponseHandler responseHandler)
+	{
+		this.put("user/" + reg_id + "/subscription/" + alias, null, responseHandler);
+	}
+
+	public void delete_alias(String alias, JsonHttpResponseHandler responseHandler)
+	{
+		this.delete("user/" + reg_id + "/subscription/" + alias , null, responseHandler);
 	}
 
 	private String getAbsoluteUrl(String relativeUrl) {
@@ -63,7 +84,7 @@ public class KISSPushClient {
 
 	public void get_alias(final Callback<ArrayList<String>> callback)
     {
-	    get("alias", new RequestParams("reg_id", reg_id),
+	    get("user/" + reg_id + "/subscription/", null,
 				new JsonHttpResponseHandler() {
 					@Override
 					public void onSuccess(JSONArray response) {
@@ -72,7 +93,6 @@ public class KISSPushClient {
 							for (int i = 0; i < response.length(); i++) {
 
 								aliases.add(response.getString(i));
-								//mDisplay.append(" -> " + alias + "\n");
 								;
 							}
 							callback.callback(aliases);
@@ -84,7 +104,7 @@ public class KISSPushClient {
     }
 
 	public void register() {
-		post("register", new RequestParams("reg_id", reg_id),
+		put("user/" + reg_id, null,
 				new AsyncHttpResponseHandler() {
 					@Override
 					public void onSuccess(String response) {
