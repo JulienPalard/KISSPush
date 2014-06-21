@@ -102,5 +102,8 @@ DROP TABLE tmp;
 """,
                 """
 ALTER TABLE message ADD COLUMN channel_id INT UNSIGNED NOT NULL DEFAULT 0;
+""",
+                """
+ALTER TABLE message ADD COLUMN ctime DATETIME NULL;
 """
                 ]
