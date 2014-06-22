@@ -18,10 +18,10 @@ public class KISSPushClient {
 	 */
 	static final String TAG = "KISSPush";
 
-	private static final String BASE_URL = "http://mdk.fr:8080/";
+	private static final String BASE_URL = "http://api.kisspush.net/";
 
 	private AsyncHttpClient client = new AsyncHttpClient();
-	private String reg_id = "";
+	private String reg_id = "null";
 
 	public interface Callback<T> {
 		   public void callback(T t);
@@ -80,6 +80,28 @@ public class KISSPushClient {
 
 	private String getAbsoluteUrl(String relativeUrl) {
 		return BASE_URL + relativeUrl;
+	}
+
+	public void list_channel(String channel, final Callback<ArrayList<String>> callback)
+	{
+		get("channel/" + channel, null,
+					new	JsonHttpResponseHandler(){
+			@Override
+			public void onSuccess(JSONArray response) {
+				ArrayList<String> messages = new ArrayList<String>();
+				try {
+					for (int i = 0; i < response.length(); i++) {
+
+						messages.add(response.getJSONObject(i).getString("message"));
+						;
+					}
+					callback.callback(messages);
+				} catch (JSONException e) {
+					Log.e(TAG, "Can't parse /channel/ response");
+				}
+			}
+		}
+		);
 	}
 
 	public void get_alias(final Callback<ArrayList<String>> callback)

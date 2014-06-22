@@ -45,19 +45,18 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
-
 import fr.mdk.kisspush.R;
+
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 import com.loopj.android.http.JsonHttpResponseHandler;
-import com.loopj.android.http.RequestParams;
 
 /**
  * Main UI for the demo app.
  */
 public class KISSPush extends ActionBarActivity {
-
+	public final static String MESSAGE_CHANNEL_NAME = "fr.mdk.kisspush.MESSAGE_CHANNEL_NAME";
 	public static final String EXTRA_MESSAGE = "message";
 	public static final String PROPERTY_REG_ID = "registration_id";
 	private static final String PROPERTY_APP_VERSION = "appVersion";
@@ -84,18 +83,22 @@ public class KISSPush extends ActionBarActivity {
 		setContentView(R.layout.main);
 		mDisplay = (ListView) findViewById(R.id.display);
 		context = getApplicationContext();
-
+        final ActionBarActivity self = this;
 		mDisplay.setOnItemClickListener(new OnItemClickListener() {
 			@Override
 			public void onItemClick(AdapterView<?> parent, View view,
 					int position, long id) {
-				kiss_push_cli.delete_alias(((TextView) view).getText()
-						.toString(), new JsonHttpResponseHandler() {
-					@Override
-					public void onSuccess(int arg0, Header[] arg1, byte[] arg2) {
-						getAliases();
-					}
-				});
+				String channel = ((TextView) view).getText().toString();
+//				kiss_push_cli.delete_alias(((TextView) view).getText()
+//						.toString(), new JsonHttpResponseHandler() {
+//					@Override
+//					public void onSuccess(int arg0, Header[] arg1, byte[] arg2) {
+//						getAliases();
+//					}
+//				});
+				Intent intent = new Intent(self, Channel.class);
+				intent.putExtra(MESSAGE_CHANNEL_NAME, channel);
+				startActivity(intent);
 			}
 		});
 
