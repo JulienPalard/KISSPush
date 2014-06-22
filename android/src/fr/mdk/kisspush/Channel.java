@@ -22,7 +22,7 @@ public class Channel extends ActionBarActivity {
 	private KISSPushClient kiss_push_cli = new KISSPushClient();
 	private Context context;
 	private ListView listViewChannels;
-	private Bundle savedInstanceState;
+	private String channel;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -32,7 +32,7 @@ public class Channel extends ActionBarActivity {
 		listViewChannels = (ListView) findViewById(R.id.listViewChannels);
 		
 		Intent intent = getIntent();
-		String channel = intent.getStringExtra(KISSPush.MESSAGE_CHANNEL_NAME);
+		channel = intent.getStringExtra(KISSPush.MESSAGE_CHANNEL_NAME);
 		kiss_push_cli
 		.list_channel(channel, new KISSPushClient.Callback<ArrayList<String>>() {
 
@@ -61,6 +61,9 @@ public class Channel extends ActionBarActivity {
 		// as you specify a parent activity in AndroidManifest.xml.
 		int id = item.getItemId();
 		if (id == R.id.action_settings) {
+			Intent intent = new Intent(this, KISSPush.class);
+			intent.putExtra(KISSPush.MESSAGE_CHANNEL_NAME, channel);
+			startActivity(intent);
 			return true;
 		}
 		return super.onOptionsItemSelected(item);

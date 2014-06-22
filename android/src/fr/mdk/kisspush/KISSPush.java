@@ -83,19 +83,19 @@ public class KISSPush extends ActionBarActivity {
 		setContentView(R.layout.main);
 		mDisplay = (ListView) findViewById(R.id.display);
 		context = getApplicationContext();
-        final ActionBarActivity self = this;
+		final ActionBarActivity self = this;
 		mDisplay.setOnItemClickListener(new OnItemClickListener() {
 			@Override
 			public void onItemClick(AdapterView<?> parent, View view,
 					int position, long id) {
 				String channel = ((TextView) view).getText().toString();
-//				kiss_push_cli.delete_alias(((TextView) view).getText()
-//						.toString(), new JsonHttpResponseHandler() {
-//					@Override
-//					public void onSuccess(int arg0, Header[] arg1, byte[] arg2) {
-//						getAliases();
-//					}
-//				});
+				// kiss_push_cli.delete_alias(((TextView) view).getText()
+				// .toString(), new JsonHttpResponseHandler() {
+				// @Override
+				// public void onSuccess(int arg0, Header[] arg1, byte[] arg2) {
+				// getAliases();
+				// }
+				// });
 				Intent intent = new Intent(self, Channel.class);
 				intent.putExtra(MESSAGE_CHANNEL_NAME, channel);
 				startActivity(intent);
@@ -109,11 +109,27 @@ public class KISSPush extends ActionBarActivity {
 			if (regid.isEmpty()) {
 				registerInBackground();
 			} else {
-				kiss_push_cli.set_reg_id(regid);
-				kiss_push_cli.register();
+				this.onRegIdAvailable(regid);
 			}
 		} else {
 			Log.i(TAG, "No valid Google Play Services APK found.");
+		}
+	}
+
+	public void onRegIdAvailable(String reg_id) {
+		kiss_push_cli.set_reg_id(reg_id);
+		kiss_push_cli.register();
+		Intent intent = getIntent();
+		String channel = intent.getStringExtra(KISSPush.MESSAGE_CHANNEL_NAME);
+		if (channel != null) {
+			kiss_push_cli.delete_alias(channel, new JsonHttpResponseHandler() {
+				@Override
+				public void onSuccess(int arg0, Header[] arg1, byte[] arg2) {
+					getAliases();
+				}
+			});
+		} else {
+			getAliases();
 		}
 	}
 
@@ -183,7 +199,6 @@ public class KISSPush extends ActionBarActivity {
 		super.onResume();
 		// Check device for Play Services APK.
 		checkPlayServices();
-		getAliases();
 	}
 
 	/**
@@ -265,6 +280,7 @@ public class KISSPush extends ActionBarActivity {
 	 * shared preferences.
 	 */
 	private void registerInBackground() {
+		final KISSPush self = this;
 		new AsyncTask<Void, Void, String>() {
 			@Override
 			protected String doInBackground(Void... params) {
@@ -275,8 +291,7 @@ public class KISSPush extends ActionBarActivity {
 					}
 					regid = gcm.register(SENDER_ID);
 					msg = "Device registered, registration ID=" + regid;
-					kiss_push_cli.set_reg_id(regid);
-					kiss_push_cli.register();
+					self.onRegIdAvailable(regid);
 					storeRegistrationId(context, regid);
 				} catch (IOException ex) {
 					msg = "Error :" + ex.getMessage();
