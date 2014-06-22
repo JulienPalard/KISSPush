@@ -22,6 +22,7 @@ public class Channel extends ActionBarActivity {
 	private KISSPushClient kiss_push_cli = new KISSPushClient();
 	private Context context;
 	private ListView listViewChannels;
+	private Bundle savedInstanceState;
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -30,10 +31,6 @@ public class Channel extends ActionBarActivity {
 		context = getApplicationContext();
 		listViewChannels = (ListView) findViewById(R.id.listViewChannels);
 		
-		if (savedInstanceState == null) {
-			getSupportFragmentManager().beginTransaction()
-					.add(R.id.container, new PlaceholderFragment()).commit();
-		}
 		Intent intent = getIntent();
 		String channel = intent.getStringExtra(KISSPush.MESSAGE_CHANNEL_NAME);
 		kiss_push_cli
@@ -41,14 +38,12 @@ public class Channel extends ActionBarActivity {
 
 			@Override
 			public void callback(ArrayList<String> t) {
-				listViewChannels = (ListView) findViewById(R.id.listViewChannels);
 				ArrayAdapter<String> adapter = new ArrayAdapter<String>(
 						context, android.R.layout.simple_list_item_1, t);
 				if (listViewChannels != null)
 					listViewChannels.setAdapter(adapter);
 			}
 		});
-
 	}
 
 	@Override
@@ -70,22 +65,4 @@ public class Channel extends ActionBarActivity {
 		}
 		return super.onOptionsItemSelected(item);
 	}
-
-	/**
-	 * A placeholder fragment containing a simple view.
-	 */
-	public static class PlaceholderFragment extends Fragment {
-
-		public PlaceholderFragment() {
-		}
-
-		@Override
-		public View onCreateView(LayoutInflater inflater, ViewGroup container,
-				Bundle savedInstanceState) {
-			View rootView = inflater.inflate(R.layout.fragment_channel,
-					container, false);
-			return rootView;
-		}
-	}
-
 }
