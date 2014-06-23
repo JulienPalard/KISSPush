@@ -21,7 +21,6 @@ public class Channel extends ActionBarActivity {
 	
 	private KISSPushClient kiss_push_cli = new KISSPushClient();
 	private Context context;
-	private ListView listViewChannels;
 	private String channel;
 	
 	@Override
@@ -29,10 +28,11 @@ public class Channel extends ActionBarActivity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_channel);
 		context = getApplicationContext();
-		listViewChannels = (ListView) findViewById(R.id.listViewChannels);
+		final ListView listViewChannels = (ListView) findViewById(R.id.listViewChannels);
 		
 		Intent intent = getIntent();
 		channel = intent.getStringExtra(KISSPush.MESSAGE_CHANNEL_NAME);
+		setTitle(channel);
 		kiss_push_cli
 		.list_channel(channel, new KISSPushClient.Callback<ArrayList<String>>() {
 
