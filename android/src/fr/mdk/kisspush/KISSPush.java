@@ -29,6 +29,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
@@ -147,6 +148,10 @@ public class KISSPush extends ActionBarActivity {
 		case R.id.action_add:
 			openAdd();
 			return true;
+		case R.id.action_help:
+			Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("http://www.kisspush.net/"));
+			startActivity(browserIntent);
+		    return true;
 		default:
 			return super.onOptionsItemSelected(item);
 		}
