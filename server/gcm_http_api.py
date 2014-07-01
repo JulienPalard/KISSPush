@@ -9,29 +9,6 @@ import cherrypy
 from cherrypy import HTTPError
 
 
-"""
-Endpoints tree:
-│
-├── /user
-│   ├── POST  Register the given reg_id
-|   ├── /REG_ID
-|   |   └── PUT   Register the given reg_id
-│   └── /subscription
-│       ├── GET    List chans REG_ID is listening
-│       ├── PUT    Replace the whole subscriptions
-│       ├── POST   Subscribe to a new channel
-│       ├── DELETE Drop all subscriptions
-│       └── /CHANNEL
-│           ├── GET    Get infos about this subscription
-│           ├── PUT    Subscribe to the given channel
-│           └── DELETE Unsubscribe from this channel
-└── /channel
-    └── /CHANNEL
-        └── POST Send a message to this channel
-
-"""
-
-
 def json_datetime_handler(obj):
     if hasattr(obj, 'isoformat'):
         return obj.isoformat()
