@@ -215,7 +215,7 @@ class GCMBackendMessage():
             query("""INSERT INTO recipient (message_id, user_id)
                           VALUES (%s, %s)""",
                   (message_id, recipient['user_id']))
-        return message_id
+        return {'message_id': message_id, 'clients': qte}
 
     def to_send(self):
         q = """

@@ -43,18 +43,20 @@ class Channel(object):
 
     def GET(self, channel):
         gcm = cherrypy.thread_data.gcm
-        return json.dumps(gcm.channel.list_messages(channel),
+        return json.dumps(gcm.channel.list_messages(channel)[1],
                           default=json_datetime_handler)
 
     @cherrypy.tools.accept(media='text/plain')
+    @cherrypy.tools.json_out()
     def POST(self, channel):
         gcm = cherrypy.thread_data.gcm
+        cherrypy.response.headers['Access-Control-Allow-Origin'] = 'http://kisspush.net'
         content_length = min(int(cherrypy.request.headers['Content-Length']),
                              4096)
         rawbody = cherrypy.request.body.read(content_length)
         if len(rawbody) == 0:
-            return json.dumps({'error': 'Empty body.'})
-        return json.dumps(gcm.message.add(rawbody, channel))
+            return {'error': 'Empty body.'}
+        return gcm.message.add(rawbody, channel)
 
 
 @cherrypy.popargs('channel')
