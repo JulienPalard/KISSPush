@@ -115,11 +115,11 @@ class GCMBackendUser():
     def add(self, reg_id):
         return query("""INSERT INTO user (registration_id, ctime, ltime)
                              VALUES (%s, NOW(), NOW())
-            ON DUPLICATE KEY UPDATE ltime = VALUES(ltime)""",
+            ON DUPLICATE KEY UPDATE ltime = VALUES(ltime), valid=1""",
                      reg_id)
 
     def get(self, reg_id=None, user_id=None, channel=None):
-        where = []
+        where = ['user.valid = 1']
         args = []
         if reg_id is None and user_id is None and channel is None:
             raise Exception('Missing parameter')
