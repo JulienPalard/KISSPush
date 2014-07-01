@@ -61,9 +61,9 @@ class GCM_Pusher(GCMBackend):
                 # need to obtain it from the list of registration_ids
                 # passed in the request (using the same index).
                 self.log.info("reg_id changed from {} to {}".format(
-                              result['registration_id'], registration_id))
-                self.user.reg_id_changed(result['registration_id'],
-                                         registration_id)
+                              registration_id, result['registration_id']))
+                self.user.reg_id_changed(registration_id,
+                                         result['registration_id'])
         elif 'error' in result:  # Otherwise, get the value of error:
             if result['error'] == 'Unavailable':
                 # If it is Unavailable, you could retry to send it in
