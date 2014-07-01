@@ -115,11 +115,11 @@ class GCMBackendUser():
     def add(self, reg_id):
         return query("""INSERT INTO user (registration_id, ctime, ltime)
                              VALUES (%s, NOW(), NOW())
-            ON DUPLICATE KEY UPDATE ltime = VALUES(ltime)""",
+            ON DUPLICATE KEY UPDATE ltime = VALUES(ltime), valid=1""",
                      reg_id)
 
     def get(self, reg_id=None, user_id=None, channel=None):
-        where = []
+        where = ['user.valid = 1']
         args = []
         if reg_id is None and user_id is None and channel is None:
             raise Exception('Missing parameter')
@@ -188,9 +188,11 @@ class GCMBackendChannel():
                      (user_id, channel_id))
 
     def list_messages(self, channel):
-        return query("""SELECT message FROM message
+        return query("""SELECT message, ctime FROM message
                         JOIN channel USING (channel_id)
-                        WHERE channel.name = %s""",
+                        WHERE channel.name = %s
+                        ORDER BY ctime DESC
+                        LIMIT 10""",
                      channel)
 
 
@@ -199,19 +201,21 @@ class GCMBackendMessage():
         self.gcm = gcm
 
     def add(self, message, to_channel, collapse_key=None,
-            delay_while_idle=False):
+            delay_while_idle=True):
         existed, channel_id = self.gcm.channel.create(to_channel)
         success, message_id = query("""
             INSERT INTO message (message, retry_after,
-                                 collapse_key, delay_while_idle, channel_id)
-                 VALUES (%s, NOW(), %s, %s, %s)""", (message, collapse_key,
+                                 collapse_key, delay_while_idle, channel_id,
+                                 ctime)
+                 VALUES (%s, NOW(), %s, %s, %s, NOW())""",
+                                    (message, collapse_key,
                                     1 if delay_while_idle else 0, channel_id))
         qte, recipients = self.gcm.user.get(channel=to_channel)
         for recipient in recipients:
             query("""INSERT INTO recipient (message_id, user_id)
                           VALUES (%s, %s)""",
                   (message_id, recipient['user_id']))
-        return message_id
+        return {'message_id': message_id, 'clients': qte}
 
     def to_send(self):
         q = """
