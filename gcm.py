@@ -201,7 +201,7 @@ class GCMBackendMessage():
         self.gcm = gcm
 
     def add(self, message, to_channel, collapse_key=None,
-            delay_while_idle=False):
+            delay_while_idle=True):
         existed, channel_id = self.gcm.channel.create(to_channel)
         success, message_id = query("""
             INSERT INTO message (message, retry_after,
