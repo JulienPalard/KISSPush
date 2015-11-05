@@ -1,5 +1,4 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
+#!/usr/bin/python3
 
 from argparse import ArgumentParser
 import logging
@@ -121,6 +120,10 @@ def parse_args(print_help=False):
     return parser.parse_args()
 
 if __name__ == '__main__':
+    logging.getLogger('gcm').addHandler(
+        logging.StreamHandler())
+    logging.getLogger('gcm').setLevel(logging.DEBUG)
+
     def on_new_thread(thread_id):
         cherrypy.thread_data.gcm = GCMBackend()
     args = parse_args()

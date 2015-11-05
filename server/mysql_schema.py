@@ -1,6 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-mysql_schema = ["""
+"""This file contains statement needed to create or upgrade your
+database schema. Each modification is logged as a new entry in
+mysql_schema, which will be applied by gcm.MySQL_schema_update.
+"""
+
+MYSQL_SCHEMA = ["""
 CREATE TABLE user
 (
     user_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
