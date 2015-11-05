@@ -3,6 +3,7 @@
 from mysql_schema import mysql_schema
 from config import config
 import logging
+from logging import handlers
 import warnings
 import MySQLdb
 import sys
@@ -26,7 +27,7 @@ The sender may be multithreade following this model:
 def setup_logging(level=logging.WARNING, syslog=False):
     logger = logging.getLogger('kisspush')
     if syslog:
-        handler = logging.handlers.SysLogHandler(address='/dev/log')
+        handler = handlers.SysLogHandler(address='/dev/log')
     else:
         handler = logging.StreamHandler()
     formatter = logging.Formatter('kisspush %(asctime)-15s %(message)s', None)
